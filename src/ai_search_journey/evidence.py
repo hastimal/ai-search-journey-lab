@@ -63,10 +63,16 @@ def _get_meaningful_tokens(normalized_name: str) -> set[str]:
     return meaningful if meaningful else tokens
 
 
-def _places_to_structured_evidence(candidate: Candidate) -> list[Evidence]:
+def _places_to_structured_evidence(
+    candidate: Candidate,
+    fanout_task_id: Optional[str] = None,
+) -> list[Evidence]:
     """Extract structured factual evidence items from a canonical Candidate model."""
     evidence_list: list[Evidence] = []
     pid = candidate.place_id
+
+    task_ids = candidate.retrieval_task_ids or ([fanout_task_id] if fanout_task_id else [])
+    formatted_task_id = ", ".join(task_ids) if task_ids else fanout_task_id
 
     if candidate.formatted_address:
         evidence_list.append(
@@ -76,6 +82,8 @@ def _places_to_structured_evidence(candidate: Candidate) -> list[Evidence]:
                 claim=f"Address: {candidate.formatted_address}",
                 source=EvidenceSource.GOOGLE_PLACES,
                 source_url=candidate.google_maps_url,
+                fanout_task_id=formatted_task_id,
+                fanout_task_ids=task_ids,
             )
         )
 
@@ -92,6 +100,8 @@ def _places_to_structured_evidence(candidate: Candidate) -> list[Evidence]:
                 claim=f"Rating: {candidate.rating}{reviews_str}",
                 source=EvidenceSource.GOOGLE_PLACES,
                 source_url=candidate.google_maps_url,
+                fanout_task_id=formatted_task_id,
+                fanout_task_ids=task_ids,
             )
         )
 
@@ -103,6 +113,8 @@ def _places_to_structured_evidence(candidate: Candidate) -> list[Evidence]:
                 claim=f"Opening Hours: {'; '.join(candidate.opening_hours)}",
                 source=EvidenceSource.GOOGLE_PLACES,
                 source_url=candidate.google_maps_url,
+                fanout_task_id=formatted_task_id,
+                fanout_task_ids=task_ids,
             )
         )
 
@@ -114,6 +126,8 @@ def _places_to_structured_evidence(candidate: Candidate) -> list[Evidence]:
                 claim=f"Website: {candidate.website_url}",
                 source=EvidenceSource.GOOGLE_PLACES,
                 source_url=candidate.website_url,
+                fanout_task_id=formatted_task_id,
+                fanout_task_ids=task_ids,
             )
         )
 
@@ -125,6 +139,8 @@ def _places_to_structured_evidence(candidate: Candidate) -> list[Evidence]:
                 claim=f"Google Maps URL: {candidate.google_maps_url}",
                 source=EvidenceSource.GOOGLE_PLACES,
                 source_url=candidate.google_maps_url,
+                fanout_task_id=formatted_task_id,
+                fanout_task_ids=task_ids,
             )
         )
 
@@ -136,6 +152,8 @@ def _places_to_structured_evidence(candidate: Candidate) -> list[Evidence]:
                 claim=f"Location coordinates: ({candidate.latitude}, {candidate.longitude})",
                 source=EvidenceSource.GOOGLE_PLACES,
                 source_url=candidate.google_maps_url,
+                fanout_task_id=formatted_task_id,
+                fanout_task_ids=task_ids,
             )
         )
 
@@ -222,6 +240,8 @@ def _extract_source_info(
 def aggregate_evidence(
     candidates: list[Candidate],
     search_results: list[SearchGroundingResult],
+    *,
+    places_task_id: Optional[str] = "F1",
 ) -> EvidenceAggregationResult:
     """Aggregate Places candidates with Search grounding evidence into candidate records.
 
@@ -234,7 +254,7 @@ def aggregate_evidence(
     candidate_evidence_map: dict[str, CandidateEvidence] = {
         c.place_id: CandidateEvidence(
             candidate=c,
-            structured_evidence=_places_to_structured_evidence(c),
+            structured_evidence=_places_to_structured_evidence(c, fanout_task_id=places_task_id),
             search_evidence=[],
         )
         for c in candidates
@@ -245,6 +265,7 @@ def aggregate_evidence(
 
     for sr in search_results:
         planner_query = sr.planner_query
+        task_id = sr.task_id
         executed_queries = sr.executed_search_queries
         sources = sr.sources
 
@@ -278,6 +299,8 @@ def aggregate_evidence(
                     source_title=source_title,
                     citation=claim_text.strip(),
                     planner_query=planner_query,
+                    fanout_task_id=task_id,
+                    fanout_task_ids=[task_id] if task_id else [],
                     executed_search_queries=executed_queries,
                     source_indices=citation.source_indices,
                 )
@@ -313,6 +336,8 @@ def aggregate_evidence(
                     source_title=first_source_title,
                     citation=p,
                     planner_query=planner_query,
+                    fanout_task_id=task_id,
+                    fanout_task_ids=[task_id] if task_id else [],
                     executed_search_queries=executed_queries,
                     source_indices=[],
                 )

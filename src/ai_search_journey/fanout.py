@@ -149,4 +149,7 @@ async def generate_fanout(
         raise RuntimeError("No valid fan-out queries were generated.")
 
     deduped = _deduplicate_queries(domain_queries)
-    return deduped[:max_queries]
+    limited = deduped[:max_queries]
+    for idx, q in enumerate(limited, start=1):
+        q.task_id = f"F{idx}"
+    return limited

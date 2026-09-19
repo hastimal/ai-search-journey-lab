@@ -133,6 +133,7 @@ async def search_places(
                 website_url=raw.get("websiteUri"),
                 google_maps_url=raw.get("googleMapsUri"),
                 opening_hours=list(weekday_descriptions),
+                retrieval_task_ids=[task.task_id] if task.task_id else [],
             )
         )
 

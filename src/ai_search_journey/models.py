@@ -40,6 +40,7 @@ class ToolName(str, Enum):
 class FanoutQuery(BaseModel):
     """A single dynamic retrieval query task generated during intent fan-out."""
 
+    task_id: Optional[str] = None
     goal: str
     query: str
     tool: ToolName
@@ -65,6 +66,7 @@ class SearchCitation(BaseModel):
 class SearchGroundingResult(BaseModel):
     """Result of executing a google_search task with Gemini + Google Search Grounding."""
 
+    task_id: Optional[str] = None
     planner_query: str
     grounded_text: str
     executed_search_queries: list[str] = Field(default_factory=list)
@@ -85,6 +87,7 @@ class Candidate(BaseModel):
     website_url: Optional[str] = None
     google_maps_url: Optional[str] = None
     opening_hours: list[str] = Field(default_factory=list)
+    retrieval_task_ids: list[str] = Field(default_factory=list)
 
 
 class EvidenceSource(str, Enum):
@@ -105,6 +108,8 @@ class Evidence(BaseModel):
     source_title: Optional[str] = None
     citation: Optional[str] = None
     planner_query: Optional[str] = None
+    fanout_task_id: Optional[str] = None
+    fanout_task_ids: list[str] = Field(default_factory=list)
     executed_search_queries: list[str] = Field(default_factory=list)
     source_indices: list[int] = Field(default_factory=list)
 
@@ -136,13 +141,85 @@ class ConstraintStatus(str, Enum):
     NOT_SATISFIED = "not_satisfied"
 
 
+class ConstraintSupport(BaseModel):
+    """A single piece of supporting or contradictory evidence with full provenance."""
+
+    source_type: str
+    fanout_task_ids: list[str] = Field(default_factory=list)
+    evidence_text: Optional[str] = None
+    planner_query: Optional[str] = None
+    source_title: Optional[str] = None
+    source_url: Optional[str] = None
+    citation_indices: list[int] = Field(default_factory=list)
+
+
 class ConstraintResult(BaseModel):
-    """Result of evaluating a specific constraint against a candidate."""
+    """Result of evaluating a specific constraint against a candidate with provenance."""
 
     constraint: str
     status: ConstraintStatus
-    reason: str
-    evidence: list[Evidence] = Field(default_factory=list)
+    supporting_evidence: list[ConstraintSupport] = Field(default_factory=list)
+    explanation: str = ""
+    reason: Optional[str] = None
+
+    @property
+    def source_type(self) -> Optional[str]:
+        """Derived primary or combined source type for backwards compatibility."""
+        if not self.supporting_evidence:
+            return None
+        types = [s.source_type for s in self.supporting_evidence]
+        if "google_places" in types and "google_search" in types:
+            return "google_places,google_search"
+        return types[0]
+
+    @property
+    def fanout_task_ids(self) -> list[str]:
+        """All unique fanout task IDs across all supporting evidence items."""
+        ids: list[str] = []
+        for s in self.supporting_evidence:
+            for tid in s.fanout_task_ids:
+                if tid and tid not in ids:
+                    ids.append(tid)
+        return ids
+
+    @property
+    def fanout_task_id(self) -> Optional[str]:
+        """Formatted comma-separated fanout task IDs for backwards compatibility."""
+        ids = self.fanout_task_ids
+        return ", ".join(ids) if ids else None
+
+    @property
+    def evidence_text(self) -> Optional[str]:
+        """First available evidence text for backwards compatibility."""
+        return self.supporting_evidence[0].evidence_text if self.supporting_evidence else None
+
+    @property
+    def source_title(self) -> Optional[str]:
+        """First available source title for backwards compatibility."""
+        return self.supporting_evidence[0].source_title if self.supporting_evidence else None
+
+    @property
+    def source_url(self) -> Optional[str]:
+        """First available source URL for backwards compatibility."""
+        return self.supporting_evidence[0].source_url if self.supporting_evidence else None
+
+    @property
+    def planner_query(self) -> Optional[str]:
+        """First available planner query for backwards compatibility."""
+        return self.supporting_evidence[0].planner_query if self.supporting_evidence else None
+
+
+class CandidateConstraintEvaluation(BaseModel):
+    """Evaluation of all journey constraints for a single candidate place."""
+
+    candidate: Candidate
+    results: list[ConstraintResult] = Field(default_factory=list)
+
+
+class ConstraintEvaluationResult(BaseModel):
+    """Complete candidate-by-constraint evaluation matrix."""
+
+    evaluations: list[CandidateConstraintEvaluation] = Field(default_factory=list)
 
 
 class RankedCandidate(BaseModel):

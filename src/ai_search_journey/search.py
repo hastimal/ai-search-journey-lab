@@ -180,6 +180,7 @@ async def search_web(
     executed_queries, sources, citations = _extract_grounding_metadata(grounding_metadata)
 
     return SearchGroundingResult(
+        task_id=task.task_id,
         planner_query=task.query,
         grounded_text=grounded_text,
         executed_search_queries=executed_queries,

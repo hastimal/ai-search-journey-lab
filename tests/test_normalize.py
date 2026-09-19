@@ -161,3 +161,30 @@ def test_accepts_nested_candidate_groups() -> None:
     assert len(result) == 3
     assert [c.place_id for c in result] == ["id_1", "id_2", "id_3"]
     assert result[1].rating == 4.9
+
+
+def test_reference_location_excluded_from_candidates() -> None:
+    """Candidates matching the reference location are excluded."""
+    c1 = Candidate(place_id="ref_1", name="Geekdom")
+    c2 = Candidate(place_id="c_2", name="Halcyon Southtown")
+    c3 = Candidate(place_id="ref_2", name="Trinity University")
+
+    # Filter for Geekdom San Antonio
+    res1 = normalize_candidates([c1, c2], reference_location="Geekdom San Antonio")
+    assert len(res1) == 1
+    assert res1[0].name == "Halcyon Southtown"
+
+    # Filter for Trinity University
+    res2 = normalize_candidates([c2, c3], reference_location="Trinity University")
+    assert len(res2) == 1
+    assert res2[0].name == "Halcyon Southtown"
+
+
+def test_retrieval_task_ids_merged_across_queries() -> None:
+    """Retrieval task IDs from multiple queries are unioned upon duplicate merging."""
+    c1 = Candidate(place_id="id_1", name="Halcyon", retrieval_task_ids=["F1"])
+    c2 = Candidate(place_id="id_1", name="Halcyon", retrieval_task_ids=["F2"])
+
+    result = normalize_candidates([c1, c2])
+    assert len(result) == 1
+    assert result[0].retrieval_task_ids == ["F1", "F2"]
