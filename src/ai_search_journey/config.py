@@ -1,4 +1,4 @@
-"""Configuration management for AI Search Journey Lab."""
+"""Configuration management for AI Search Journey."""
 
 from typing import Optional
 
