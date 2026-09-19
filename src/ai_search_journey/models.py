@@ -102,7 +102,26 @@ class Evidence(BaseModel):
     claim: str
     source: EvidenceSource
     source_url: Optional[str] = None
+    source_title: Optional[str] = None
     citation: Optional[str] = None
+    planner_query: Optional[str] = None
+    executed_search_queries: list[str] = Field(default_factory=list)
+    source_indices: list[int] = Field(default_factory=list)
+
+
+class CandidateEvidence(BaseModel):
+    """Candidate place linked to its structured Places and unstructured Search evidence."""
+
+    candidate: Candidate
+    structured_evidence: list[Evidence] = Field(default_factory=list)
+    search_evidence: list[Evidence] = Field(default_factory=list)
+
+
+class EvidenceAggregationResult(BaseModel):
+    """Result of aggregating Places candidates with Search grounding evidence."""
+
+    candidates: list[CandidateEvidence] = Field(default_factory=list)
+    unmatched_search_evidence: list[Evidence] = Field(default_factory=list)
 
 
 class ConstraintStatus(str, Enum):

@@ -1,11 +1,14 @@
 """AI Search Journey package initialization."""
 
+from ai_search_journey.evidence import aggregate_evidence
 from ai_search_journey.fanout import generate_fanout
 from ai_search_journey.models import (
     Candidate,
+    CandidateEvidence,
     ConstraintResult,
     ConstraintStatus,
     Evidence,
+    EvidenceAggregationResult,
     EvidenceSource,
     FanoutQuery,
     GroundedAnswer,
@@ -34,8 +37,10 @@ __all__ = [
     "SearchCitation",
     "SearchGroundingResult",
     "Candidate",
+    "CandidateEvidence",
     "EvidenceSource",
     "Evidence",
+    "EvidenceAggregationResult",
     "ConstraintStatus",
     "ConstraintResult",
     "RankedCandidate",
@@ -46,4 +51,5 @@ __all__ = [
     "search_places",
     "normalize_candidates",
     "search_web",
+    "aggregate_evidence",
 ]
