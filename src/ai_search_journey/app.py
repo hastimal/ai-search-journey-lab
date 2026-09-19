@@ -125,10 +125,8 @@ def render_app() -> None:
             )
             st.session_state.journey_result = journey
             st.session_state.journey_error = None
-            # Update container with full inspection details
-            if journey.execution_trace:
-                with timeline_box.container(border=True):
-                    render_execution_timeline(journey.execution_trace, journey=journey)
+            # Update live box with final collapsible trace
+            timeline_box.empty()
         except Exception as e:
             st.session_state.journey_error = str(e)
             st.session_state.journey_result = None
@@ -139,6 +137,10 @@ def render_app() -> None:
     if not journey:
         st.info("💡 Click **Run Search Journey** above to inspect the end-to-end execution.")
         return
+
+    # 3. Search Journey Complete Collapsible Expander (Default collapsed)
+    if journey.execution_trace:
+        render_execution_timeline(journey.execution_trace, journey=journey)
 
     # Tabs for Journey Sections
     tab_overview, tab_fanout, tab_matrix, tab_evidence, tab_trace = st.tabs([

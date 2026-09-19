@@ -8,6 +8,7 @@ from typing import Optional
 from ai_search_journey.models import (
     ConstraintResult,
     ConstraintStatus,
+    JourneyExecutionTrace,
     JourneyResult,
     RankedCandidate,
     SearchIntent,
@@ -224,38 +225,17 @@ def extract_source_domain(url: str) -> str:
         return url
 
 
-def render_execution_timeline(
-    trace: object,
-    total_elapsed: Optional[float] = None,
+def _render_timeline_steps(
+    trace: JourneyExecutionTrace,
     journey: Optional[JourneyResult] = None,
 ) -> None:
-    """Render the live or completed Search Journey Execution timeline in Streamlit."""
+    """Render the list of steps and nested inspection details."""
     import streamlit as st
 
     from ai_search_journey.models import (
         ConstraintStatus,
-        JourneyExecutionTrace,
         ToolName,
     )
-
-    if not isinstance(trace, JourneyExecutionTrace):
-        return
-
-    # Header line
-    if trace.is_complete:
-        total_time_str = (
-            f"{trace.total_duration_seconds:.1f}s"
-            if trace.total_duration_seconds is not None
-            else ""
-        )
-        header_title = f"✅ **Search Journey Complete** (Total time: `{total_time_str}`)"
-    elif trace.failed_step_key:
-        header_title = "❌ **Search Journey Execution Failed**"
-    else:
-        elapsed_str = f"({total_elapsed:.1f}s elapsed)" if total_elapsed is not None else ""
-        header_title = f"⏳ **Executing Search Journey...** `{elapsed_str}`"
-
-    st.markdown(header_title)
 
     for step in trace.steps:
         st_val = step.status.value if hasattr(step.status, "value") else str(step.status)
@@ -393,5 +373,40 @@ def render_execution_timeline(
                             f"(Proximity bonus: `+{rc.proximity_score:.2f}`)\n"
                             f"- Rating quality bonus: `+{rc.quality_score:.2f}`"
                         )
+
+
+def render_execution_timeline(
+    trace: object,
+    total_elapsed: Optional[float] = None,
+    journey: Optional[JourneyResult] = None,
+) -> None:
+    """Render the live or completed Search Journey Execution timeline in Streamlit."""
+    import streamlit as st
+
+    from ai_search_journey.models import JourneyExecutionTrace
+
+    if not isinstance(trace, JourneyExecutionTrace):
+        return
+
+    # COMPLETED STATE: Render inside a collapsible expander (collapsed by default)
+    if trace.is_complete:
+        dur = trace.total_duration_seconds or (total_elapsed or 0.0)
+        expander_title = f"✅ Search Journey Complete · {dur:.1f}s"
+        with st.expander(expander_title, expanded=False):
+            _render_timeline_steps(trace, journey=journey)
+        return
+
+    # FAILED STATE
+    if trace.failed_step_key:
+        header_title = "❌ **Search Journey Execution Failed**"
+        st.markdown(header_title)
+        _render_timeline_steps(trace, journey=journey)
+        return
+
+    # RUNNING STATE: Live execution panel expanded
+    elapsed_str = f"({total_elapsed:.1f}s elapsed)" if total_elapsed is not None else ""
+    header_title = f"⏳ **Executing Search Journey...** `{elapsed_str}`"
+    st.markdown(header_title)
+    _render_timeline_steps(trace, journey=journey)
 
 
