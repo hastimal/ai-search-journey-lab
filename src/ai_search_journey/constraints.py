@@ -6,6 +6,7 @@ from typing import Optional
 from ai_search_journey.models import (
     CandidateConstraintEvaluation,
     CandidateEvidence,
+    CategoryEligibility,
     ConstraintEvaluationResult,
     ConstraintResult,
     ConstraintStatus,
@@ -383,6 +384,165 @@ def _evaluate_qualitative_constraint(
     )
 
 
+def evaluate_category_eligibility(
+    requested_category: Optional[str],
+    primary_type: Optional[str],
+    place_types: list[str],
+) -> CategoryEligibility:
+    """Deterministically evaluate candidate category compatibility against SearchIntent.category.
+
+    Rules:
+    - If no requested category: SUPPORTED
+    - If candidate has no type information at all: UNKNOWN
+    - Normalized token matching across requested category tokens and candidate place types:
+      - Direct type match / substring match (e.g. 'coffee_shop', 'cafe', 'espresso_bar',
+        'indian_restaurant', 'restaurant') -> SUPPORTED
+      - Incompatible / unrelated types without category match
+        (e.g., store, university, lodging without cafe/restaurant) -> NOT_SATISFIED
+      - Ambiguous / unverified -> UNKNOWN
+    """
+    if not requested_category or not requested_category.strip():
+        return CategoryEligibility(
+            status=ConstraintStatus.SUPPORTED,
+            requested_category=requested_category or "",
+            primary_type=primary_type,
+            place_types=place_types,
+            explanation="No specific category filter requested.",
+        )
+
+    clean_req = requested_category.strip().lower()
+    all_candidate_types = [t.lower() for t in place_types]
+    if primary_type:
+        all_candidate_types.insert(0, primary_type.lower())
+
+    if not all_candidate_types:
+        return CategoryEligibility(
+            status=ConstraintStatus.UNKNOWN,
+            requested_category=requested_category,
+            primary_type=primary_type,
+            place_types=place_types,
+            explanation=(
+                f"No Places type metadata available to verify category '{requested_category}'."
+            ),
+        )
+
+    # Token-level category compatibility mappings
+    # Coffee shop scenario
+    if "coffee" in clean_req:
+        compatible_primary = {
+            "coffee_shop",
+            "cafe",
+            "coffee_store",
+            "coffee_roastery",
+            "espresso_bar",
+            "tea_house",
+        }
+        # If primary_type is provided, it must be a compatible coffee/cafe type
+        if primary_type:
+            if primary_type.lower() in compatible_primary:
+                return CategoryEligibility(
+                    status=ConstraintStatus.SUPPORTED,
+                    requested_category=requested_category,
+                    primary_type=primary_type,
+                    place_types=place_types,
+                    explanation=f"Compatible coffee primary type verified: {primary_type}.",
+                )
+            else:
+                return CategoryEligibility(
+                    status=ConstraintStatus.NOT_SATISFIED,
+                    requested_category=requested_category,
+                    primary_type=primary_type,
+                    place_types=place_types,
+                    explanation=(
+                        f"Primary type '{primary_type}' is not a dedicated coffee shop or cafe."
+                    ),
+                )
+        # If no primary_type, check if any place_type matches
+        if any(t in compatible_primary for t in all_candidate_types):
+            return CategoryEligibility(
+                status=ConstraintStatus.SUPPORTED,
+                requested_category=requested_category,
+                primary_type=primary_type,
+                place_types=place_types,
+                explanation=(
+                    "Compatible coffee category type verified in place types: "
+                    f"{all_candidate_types[0]}."
+                ),
+            )
+        return CategoryEligibility(
+            status=ConstraintStatus.NOT_SATISFIED,
+            requested_category=requested_category,
+            primary_type=primary_type,
+            place_types=place_types,
+            explanation=(
+                f"Candidate types {all_candidate_types[:4]} are not a "
+                "dedicated coffee shop or cafe."
+            ),
+        )
+
+    # Restaurant / Indian restaurant scenario
+    if "restaurant" in clean_req or "food" in clean_req or "cuisine" in clean_req:
+        # Check specific cuisines
+        if "indian" in clean_req:
+            if "indian_restaurant" in all_candidate_types:
+                return CategoryEligibility(
+                    status=ConstraintStatus.SUPPORTED,
+                    requested_category=requested_category,
+                    primary_type=primary_type,
+                    place_types=place_types,
+                    explanation="Compatible type 'indian_restaurant' verified.",
+                )
+            if any("restaurant" in t for t in all_candidate_types):
+                # Generic restaurant type for Indian query without specific indian_restaurant type
+                return CategoryEligibility(
+                    status=ConstraintStatus.UNKNOWN,
+                    requested_category=requested_category,
+                    primary_type=primary_type,
+                    place_types=place_types,
+                    explanation=(
+                        "Restaurant type verified, but specific Indian cuisine type is unverified."
+                    ),
+                )
+        else:
+            if any("restaurant" in t or "food" in t or "cafe" in t for t in all_candidate_types):
+                matched_type = primary_type or all_candidate_types[0]
+                return CategoryEligibility(
+                    status=ConstraintStatus.SUPPORTED,
+                    requested_category=requested_category,
+                    primary_type=primary_type,
+                    place_types=place_types,
+                    explanation=f"Compatible restaurant type verified: {matched_type}.",
+                )
+
+    # Generic substring / word token match
+    req_tokens = set(re.findall(r"\w+", clean_req))
+    matched_tokens: set[str] = set()
+    for t in all_candidate_types:
+        type_tokens = set(t.split("_"))
+        matched_tokens.update(req_tokens.intersection(type_tokens))
+
+    if matched_tokens:
+        return CategoryEligibility(
+            status=ConstraintStatus.SUPPORTED,
+            requested_category=requested_category,
+            primary_type=primary_type,
+            place_types=place_types,
+            explanation=f"Category tokens {matched_tokens} match candidate place types.",
+        )
+
+    # Default fallback to UNKNOWN rather than guessing
+    return CategoryEligibility(
+        status=ConstraintStatus.UNKNOWN,
+        requested_category=requested_category,
+        primary_type=primary_type,
+        place_types=place_types,
+        explanation=(
+            f"Candidate types {all_candidate_types[:3]} do not definitively verify "
+            f"'{requested_category}'."
+        ),
+    )
+
+
 def evaluate_constraints(
     intent: SearchIntent,
     candidate_evidences: list[CandidateEvidence],
@@ -392,6 +552,7 @@ def evaluate_constraints(
     Deterministic rules:
     - Never converts missing/insufficient evidence into NOT_SATISFIED (UNKNOWN != FALSE).
     - Preserves provenance (supporting_evidence with full ConstraintSupport metadata).
+    - Evaluates category compatibility as a primary constraint.
     - Pure computation with no LLM or API calls.
     """
     evaluations: list[CandidateConstraintEvaluation] = []
@@ -399,6 +560,35 @@ def evaluate_constraints(
     for ce in candidate_evidences:
         candidate = ce.candidate
         results: list[ConstraintResult] = []
+
+        # 0. Evaluate category compatibility constraint
+        if intent.category:
+            cat_elig = evaluate_category_eligibility(
+                intent.category,
+                candidate.primary_type,
+                candidate.place_types,
+            )
+            cat_support: list[ConstraintSupport] = []
+            if cat_elig.status == ConstraintStatus.SUPPORTED:
+                type_summary = (
+                    f"Primary Type: {candidate.primary_type or 'N/A'}, "
+                    f"Types: {','.join(candidate.place_types[:4])}"
+                )
+                cat_support.append(
+                    ConstraintSupport(
+                        source_type="google_places",
+                        fanout_task_ids=candidate.retrieval_task_ids or ["F1"],
+                        evidence_text=type_summary,
+                    )
+                )
+            results.append(
+                ConstraintResult(
+                    constraint=f"Category: {intent.category}",
+                    status=cat_elig.status,
+                    supporting_evidence=cat_support,
+                    explanation=cat_elig.explanation,
+                )
+            )
 
         # 1. Evaluate open_after constraint
         if intent.open_after:
@@ -418,6 +608,8 @@ def evaluate_constraints(
         # 3. Evaluate other hard constraints
         for hc in intent.hard_constraints:
             hc_lower = hc.lower()
+            if intent.category and intent.category.lower() in hc_lower:
+                continue
             if intent.open_after and ("open after" in hc_lower or "late" in hc_lower):
                 continue
             if intent.group_size and ("group" in hc_lower or str(intent.group_size) in hc_lower):

@@ -84,6 +84,8 @@ class Candidate(BaseModel):
     longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
     rating: Optional[float] = Field(default=None, ge=0.0, le=5.0)
     user_rating_count: Optional[int] = Field(default=None, ge=0)
+    primary_type: Optional[str] = None
+    place_types: list[str] = Field(default_factory=list)
     website_url: Optional[str] = None
     google_maps_url: Optional[str] = None
     opening_hours: list[str] = Field(default_factory=list)
@@ -139,6 +141,16 @@ class ConstraintStatus(str, Enum):
     SUPPORTED = "supported"
     UNKNOWN = "unknown"
     NOT_SATISFIED = "not_satisfied"
+
+
+class CategoryEligibility(BaseModel):
+    """Result of evaluating candidate category compatibility against SearchIntent.category."""
+
+    status: ConstraintStatus
+    requested_category: str
+    primary_type: Optional[str] = None
+    place_types: list[str] = Field(default_factory=list)
+    explanation: str
 
 
 class ConstraintSupport(BaseModel):
@@ -249,6 +261,7 @@ class RankedCandidate(BaseModel):
     distance_miles: Optional[float] = None
     proximity_score: float = 0.0
     quality_score: float = 0.0
+    category_eligibility: Optional[CategoryEligibility] = None
     ranking_reasons: list[str] = Field(default_factory=list)
 
 
@@ -271,11 +284,25 @@ class StaticMapResult(BaseModel):
     markers: list[MapMarker] = Field(default_factory=list)
 
 
+class FinalRecommendation(BaseModel):
+    """Grounded recommendation details for a single ranked candidate."""
+
+    rank: int
+    candidate_name: str
+    summary: str
+    why_it_matches: list[str] = Field(default_factory=list)
+    unknowns: list[str] = Field(default_factory=list)
+    conflicts: list[str] = Field(default_factory=list)
+    evidence_sources: list[str] = Field(default_factory=list)
+    maps_url: Optional[str] = None
+
+
 class GroundedAnswer(BaseModel):
     """Final synthesized answer grounded in retrieved evidence."""
 
     summary: str
-    recommendations: list[RankedCandidate] = Field(default_factory=list)
+    recommendations: list[FinalRecommendation] = Field(default_factory=list)
+    caveats: list[str] = Field(default_factory=list)
     citations: list[str] = Field(default_factory=list)
 
 
@@ -290,4 +317,5 @@ class JourneyResult(BaseModel):
     ranking: list[RankedCandidate] = Field(default_factory=list)
     static_map: Optional[StaticMapResult] = None
     answer: Optional[GroundedAnswer] = None
+
 

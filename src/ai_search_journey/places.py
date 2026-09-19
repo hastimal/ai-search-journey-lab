@@ -16,6 +16,8 @@ FIELD_MASK = (
     "places.location,"
     "places.rating,"
     "places.userRatingCount,"
+    "places.primaryType,"
+    "places.types,"
     "places.regularOpeningHours,"
     "places.websiteUri,"
     "places.googleMapsUri"
@@ -219,6 +221,12 @@ async def search_places(
                 user_rating_count=int(raw["userRatingCount"])
                 if raw.get("userRatingCount") is not None
                 else None,
+                primary_type=str(raw["primaryType"]) if raw.get("primaryType") else None,
+                place_types=(
+                    [str(t) for t in raw["types"]]
+                    if isinstance(raw.get("types"), list)
+                    else []
+                ),
                 website_url=raw.get("websiteUri"),
                 google_maps_url=raw.get("googleMapsUri"),
                 opening_hours=list(weekday_descriptions),

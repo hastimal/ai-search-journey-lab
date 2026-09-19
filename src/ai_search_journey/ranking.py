@@ -5,6 +5,7 @@ from typing import Optional
 
 from ai_search_journey.models import (
     CandidateConstraintEvaluation,
+    CategoryEligibility,
     ConstraintEvaluationResult,
     ConstraintResult,
     ConstraintStatus,
@@ -187,11 +188,25 @@ def _evaluate_single_candidate(
             f"Quality signal: {candidate.rating}★ (+{quality_score:.1f} pts)."
         )
 
+    # Find category eligibility if present in results
+    category_eligibility = None
+    for r in results:
+        if r.constraint.startswith("Category:"):
+            category_eligibility = CategoryEligibility(
+                status=r.status,
+                requested_category=r.constraint.replace("Category:", "").strip(),
+                primary_type=candidate.primary_type,
+                place_types=candidate.place_types,
+                explanation=r.explanation or "",
+            )
+            break
+
     return RankedCandidate(
         candidate=candidate,
         score=round(score, 2),
         rank=1,
         constraint_results=results,
+        category_eligibility=category_eligibility,
         hard_supported=hard_supported,
         hard_unknown=hard_unknown,
         hard_failed=hard_failed,

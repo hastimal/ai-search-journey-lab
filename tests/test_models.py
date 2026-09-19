@@ -10,6 +10,7 @@ from ai_search_journey.models import (
     Evidence,
     EvidenceSource,
     FanoutQuery,
+    FinalRecommendation,
     GroundedAnswer,
     IntentType,
     JourneyResult,
@@ -175,9 +176,20 @@ def test_full_journey_result_construction() -> None:
         ranking_reasons=["Satisfies all hard constraints", "High user rating"],
     )
 
+    recommendation = FinalRecommendation(
+        rank=1,
+        candidate_name="Local Roast Coffee",
+        summary="Matches group work and late night criteria.",
+        why_it_matches=["Open after 20:00 (Google Places)"],
+        unknowns=[],
+        conflicts=[],
+        evidence_sources=["Google Places"],
+        maps_url="https://maps.google.com/?cid=123",
+    )
+
     answer = GroundedAnswer(
         summary="Found 1 excellent coffee shop matching all requirements.",
-        recommendations=[ranked_candidate],
+        recommendations=[recommendation],
         citations=["https://maps.google.com/?cid=123", "https://example.com/review"],
     )
 

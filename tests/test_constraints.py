@@ -4,6 +4,7 @@ from ai_search_journey.constraints import (
     _evaluate_group_size,
     _evaluate_open_after,
     _evaluate_qualitative_constraint,
+    evaluate_category_eligibility,
     evaluate_constraints,
 )
 from ai_search_journey.models import (
@@ -358,3 +359,69 @@ def test_evaluator_is_pure_and_does_not_call_apis() -> None:
     assert matrix.evaluations[0].results[0].supporting_evidence == []
     assert matrix.evaluations[0].results[1].status == ConstraintStatus.UNKNOWN
     assert matrix.evaluations[0].results[1].supporting_evidence == []
+
+
+def test_requested_coffee_shop_with_coffee_shop_type_is_supported() -> None:
+    """Requested coffee shop + coffee_shop type => SUPPORTED."""
+    elig = evaluate_category_eligibility(
+        requested_category="coffee shop",
+        primary_type="coffee_shop",
+        place_types=["coffee_shop", "cafe", "food", "point_of_interest"],
+    )
+    assert elig.status == ConstraintStatus.SUPPORTED
+    assert "Compatible coffee" in elig.explanation
+
+
+def test_requested_coffee_shop_with_compatible_cafe_type_is_supported() -> None:
+    """Requested coffee shop + cafe type => SUPPORTED."""
+    elig = evaluate_category_eligibility(
+        requested_category="coffee shop",
+        primary_type="cafe",
+        place_types=["cafe", "food", "store"],
+    )
+    assert elig.status == ConstraintStatus.SUPPORTED
+
+
+def test_unrelated_type_returns_not_satisfied() -> None:
+    """Unrelated primary type (e.g. university, bakery without cafe) => NOT_SATISFIED."""
+    elig_uni = evaluate_category_eligibility(
+        requested_category="coffee shop",
+        primary_type="university",
+        place_types=["university", "point_of_interest"],
+    )
+    assert elig_uni.status == ConstraintStatus.NOT_SATISFIED
+
+    elig_bakery = evaluate_category_eligibility(
+        requested_category="coffee shop",
+        primary_type="bakery",
+        place_types=["bakery", "restaurant", "food"],
+    )
+    assert elig_bakery.status == ConstraintStatus.NOT_SATISFIED
+
+
+def test_missing_type_information_returns_unknown() -> None:
+    """Missing type metadata => UNKNOWN without hallucinating match."""
+    elig = evaluate_category_eligibility(
+        requested_category="coffee shop",
+        primary_type=None,
+        place_types=[],
+    )
+    assert elig.status == ConstraintStatus.UNKNOWN
+
+
+def test_indian_restaurant_scenario_supported_and_unknown() -> None:
+    """Indian restaurant scenario: SUPPORTED for indian_restaurant, UNKNOWN for generic."""
+    elig_ind = evaluate_category_eligibility(
+        requested_category="Indian restaurant",
+        primary_type="indian_restaurant",
+        place_types=["indian_restaurant", "restaurant", "food"],
+    )
+    assert elig_ind.status == ConstraintStatus.SUPPORTED
+
+    elig_generic = evaluate_category_eligibility(
+        requested_category="Indian restaurant",
+        primary_type="restaurant",
+        place_types=["restaurant", "food"],
+    )
+    assert elig_generic.status == ConstraintStatus.UNKNOWN
+

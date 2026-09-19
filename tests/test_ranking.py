@@ -506,3 +506,88 @@ def test_missing_coordinates_handled_safely() -> None:
     assert ranked_no_ref[0].score == 25.0
 
 
+def test_category_mismatch_cannot_reach_top_3() -> None:
+    """A business with a clear category mismatch receives -35 penalty and cannot reach Top 3."""
+    c_mismatch = Candidate(
+        place_id="c_mismatch",
+        name="Alamo Unrelated Bakery",
+        primary_type="bakery",
+        place_types=["bakery", "restaurant"],
+        rating=4.9,
+        user_rating_count=2000,
+    )
+    c1 = Candidate(
+        place_id="c1",
+        name="Coffee Roaster One",
+        primary_type="coffee_shop",
+        place_types=["coffee_shop", "cafe"],
+        rating=4.5,
+        user_rating_count=300,
+    )
+    c2 = Candidate(
+        place_id="c2",
+        name="Cafe Two",
+        primary_type="cafe",
+        place_types=["cafe"],
+        rating=4.6,
+        user_rating_count=400,
+    )
+    c3 = Candidate(
+        place_id="c3",
+        name="Espresso Three",
+        primary_type="coffee_shop",
+        place_types=["coffee_shop"],
+        rating=4.4,
+        user_rating_count=200,
+    )
+
+    eval_mismatch = CandidateConstraintEvaluation(
+        candidate=c_mismatch,
+        results=[
+            ConstraintResult(
+                constraint="Category: coffee shop",
+                status=ConstraintStatus.NOT_SATISFIED,
+                explanation="Primary type bakery is not a dedicated coffee shop",
+            ),
+            ConstraintResult(
+                constraint="Open after 20:00",
+                status=ConstraintStatus.SUPPORTED,
+            ),
+        ],
+    )
+    eval1 = CandidateConstraintEvaluation(
+        candidate=c1,
+        results=[
+            ConstraintResult(constraint="Category: coffee shop", status=ConstraintStatus.SUPPORTED),
+            ConstraintResult(constraint="Open after 20:00", status=ConstraintStatus.SUPPORTED),
+        ],
+    )
+    eval2 = CandidateConstraintEvaluation(
+        candidate=c2,
+        results=[
+            ConstraintResult(constraint="Category: coffee shop", status=ConstraintStatus.SUPPORTED),
+            ConstraintResult(constraint="Open after 20:00", status=ConstraintStatus.SUPPORTED),
+        ],
+    )
+    eval3 = CandidateConstraintEvaluation(
+        candidate=c3,
+        results=[
+            ConstraintResult(constraint="Category: coffee shop", status=ConstraintStatus.SUPPORTED),
+            ConstraintResult(constraint="Open after 20:00", status=ConstraintStatus.SUPPORTED),
+        ],
+    )
+
+    ranked = rank_candidates(
+        ConstraintEvaluationResult(evaluations=[eval_mismatch, eval1, eval2, eval3]),
+        top_n=3,
+    )
+
+    assert len(ranked) == 3
+    top_3_ids = [r.candidate.place_id for r in ranked]
+    assert "c_mismatch" not in top_3_ids
+    assert set(top_3_ids) == {"c1", "c2", "c3"}
+    assert ranked[0].category_eligibility is not None
+    assert ranked[0].category_eligibility.status == ConstraintStatus.SUPPORTED
+
+
+

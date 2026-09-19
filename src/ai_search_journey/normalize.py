@@ -89,6 +89,19 @@ def _merge_candidate(canonical: Candidate, incoming: Candidate) -> Candidate:
     if canonical.user_rating_count is None and incoming.user_rating_count is not None:
         updated_fields["user_rating_count"] = incoming.user_rating_count
 
+    if canonical.primary_type is None and incoming.primary_type is not None:
+        updated_fields["primary_type"] = incoming.primary_type
+
+    if not canonical.place_types and incoming.place_types:
+        updated_fields["place_types"] = list(incoming.place_types)
+    elif canonical.place_types and incoming.place_types:
+        merged_types = list(canonical.place_types)
+        for t in incoming.place_types:
+            if t not in merged_types:
+                merged_types.append(t)
+        if merged_types != canonical.place_types:
+            updated_fields["place_types"] = merged_types
+
     if canonical.website_url is None and incoming.website_url is not None:
         updated_fields["website_url"] = incoming.website_url
 
