@@ -1,10 +1,11 @@
-"""Minimal demo script for testing Google Places API (New) retrieval."""
+"""Minimal demo script for testing Google Places API (New) retrieval and Candidate Normalization."""
 
 import asyncio
 import sys
 
 from ai_search_journey.fanout import generate_fanout
-from ai_search_journey.models import SearchIntent, ToolName
+from ai_search_journey.models import Candidate, SearchIntent, ToolName
+from ai_search_journey.normalize import normalize_candidates
 from ai_search_journey.places import search_places
 from ai_search_journey.planner import extract_intent
 
@@ -71,7 +72,7 @@ def format_intent(intent: SearchIntent) -> str:
 
 async def main() -> None:
     question = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_QUESTION
-    print("\n--- GOOGLE PLACES RETRIEVAL DEMO ---\n")
+    print("\n--- GOOGLE PLACES RETRIEVAL & NORMALIZATION DEMO ---\n")
     print(f"QUESTION:\n{question}\n")
 
     try:
@@ -92,18 +93,30 @@ async def main() -> None:
         places_tasks = [q for q in fanout if q.tool == ToolName.GOOGLE_PLACES]
         print(f"Executing {len(places_tasks)} Google Places API retrieval task(s)...\n")
 
-        all_candidates = []
-        seen_ids = set()
+        raw_candidate_groups: list[list[Candidate]] = []
+        raw_candidates_flat: list[Candidate] = []
 
         for task in places_tasks:
             candidates = await search_places(task, max_results=10)
-            for c in candidates:
-                if c.place_id not in seen_ids:
-                    seen_ids.add(c.place_id)
-                    all_candidates.append(c)
+            raw_candidate_groups.append(candidates)
+            raw_candidates_flat.extend(candidates)
 
-        print(f"GOOGLE PLACES RESULTS ({len(all_candidates)} candidates retrieved):\n")
-        for idx, c in enumerate(all_candidates, start=1):
+        normalized = normalize_candidates(raw_candidate_groups)
+
+        duplicates_removed = len(raw_candidates_flat) - len(normalized)
+
+        print("=" * 60)
+        print("RETRIEVAL SUMMARY")
+        print("=" * 60)
+        print(f"Places tasks executed:                    {len(places_tasks)}")
+        print(f"Raw candidate records before normalization: {len(raw_candidates_flat)}")
+        print(f"Unique candidates after normalization:    {len(normalized)}")
+        print(f"Duplicate records removed:                {duplicates_removed}")
+        print("=" * 60)
+        print()
+
+        print(f"NORMALIZED CANDIDATES ({len(normalized)} canonical places):\n")
+        for idx, c in enumerate(normalized, start=1):
             print(f"Candidate {idx}:")
             print(f"Name:            {c.name}")
             print(f"Place ID:        {c.place_id}")
