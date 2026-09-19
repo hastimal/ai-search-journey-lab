@@ -72,6 +72,29 @@ Recommendation / Answer
 - Multi-agent search
 - Search evaluation
 
+## Deployment (Google Cloud Run)
+
+### 1. One-Time Setup
+Run the bootstrap script to enable APIs, create the Artifact Registry repository, configure the runtime service account, and provision Secret Manager secret holders:
+
+```bash
+./scripts/bootstrap_gcp.sh
+```
+
+If secret versions have not been added yet, add your API keys securely:
+
+```bash
+echo -n "YOUR_GEMINI_API_KEY" | gcloud secrets versions add gemini-api-key --data-file=- --project=ai-search-journey-lab
+echo -n "YOUR_GOOGLE_MAPS_API_KEY" | gcloud secrets versions add google-maps-api-key --data-file=- --project=ai-search-journey-lab
+```
+
+### 2. Deploy or Update
+Build the multi-arch `linux/amd64` container image, push to Artifact Registry, and deploy directly to Cloud Run:
+
+```bash
+./scripts/deploy_cloud_run.sh
+```
+
 ## Roadmap
 
 - v0.1 - Query Fan-Out
