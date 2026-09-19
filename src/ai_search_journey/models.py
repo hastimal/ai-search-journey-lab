@@ -252,6 +252,25 @@ class RankedCandidate(BaseModel):
     ranking_reasons: list[str] = Field(default_factory=list)
 
 
+class MapMarker(BaseModel):
+    """Metadata for a single marker placed on a static map."""
+
+    label: str
+    rank: int
+    candidate_name: str
+    latitude: float
+    longitude: float
+
+
+class StaticMapResult(BaseModel):
+    """Result of generating a Google Maps Static API preview."""
+
+    url: str
+    redacted_url: str
+    marker_count: int
+    markers: list[MapMarker] = Field(default_factory=list)
+
+
 class GroundedAnswer(BaseModel):
     """Final synthesized answer grounded in retrieved evidence."""
 
@@ -269,4 +288,6 @@ class JourneyResult(BaseModel):
     candidates: list[Candidate] = Field(default_factory=list)
     evidence: list[Evidence] = Field(default_factory=list)
     ranking: list[RankedCandidate] = Field(default_factory=list)
+    static_map: Optional[StaticMapResult] = None
     answer: Optional[GroundedAnswer] = None
+
