@@ -312,10 +312,30 @@ class JourneyResult(BaseModel):
     question: str
     intent: SearchIntent
     fanout: list[FanoutQuery] = Field(default_factory=list)
+    reference_location: Optional[ReferenceLocation] = None
     candidates: list[Candidate] = Field(default_factory=list)
+    search_results: list[SearchGroundingResult] = Field(default_factory=list)
+    evidence_result: Optional[EvidenceAggregationResult] = None
+    constraint_result: Optional[ConstraintEvaluationResult] = None
     evidence: list[Evidence] = Field(default_factory=list)
     ranking: list[RankedCandidate] = Field(default_factory=list)
     static_map: Optional[StaticMapResult] = None
     answer: Optional[GroundedAnswer] = None
+    trace_steps: list[str] = Field(default_factory=list)
+
+    @property
+    def fanout_queries(self) -> list[FanoutQuery]:
+        """Alias for fanout queries."""
+        return self.fanout
+
+    @property
+    def ranked_candidates(self) -> list[RankedCandidate]:
+        """Alias for ranked candidates."""
+        return self.ranking
+
+    @property
+    def grounded_answer(self) -> Optional[GroundedAnswer]:
+        """Alias for answer."""
+        return self.answer
 
 
