@@ -13,6 +13,7 @@ from ai_search_journey.models import (
     SearchIntent,
     ToolName,
 )
+from ai_search_journey.planner import extract_intent
 
 __version__ = "0.1.0"
 
@@ -28,4 +29,5 @@ __all__ = [
     "RankedCandidate",
     "GroundedAnswer",
     "JourneyResult",
+    "extract_intent",
 ]

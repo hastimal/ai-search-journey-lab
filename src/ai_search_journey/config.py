@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     )
 
     gemini_api_key: Optional[str] = None
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.6-flash"
 
     google_maps_api_key: Optional[str] = None
 

@@ -12,5 +12,5 @@ def test_package_version() -> None:
 def test_settings_defaults() -> None:
     """Verify default configuration settings."""
     settings = Settings()
-    assert settings.gemini_model == "gemini-2.5-flash"
+    assert settings.gemini_model == "gemini-3.6-flash"
     assert settings.log_level == "INFO"
