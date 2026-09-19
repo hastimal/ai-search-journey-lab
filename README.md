@@ -95,6 +95,17 @@ Build the multi-arch `linux/amd64` container image, push to Artifact Registry, a
 ./scripts/deploy_cloud_run.sh
 ```
 
+### 3. Clean Deployed App
+Remove the Cloud Run service and Artifact Registry application images while preserving secrets, the repository, and service account configuration:
+
+```bash
+# Interactive confirmation:
+./scripts/delete_cloud_run.sh
+
+# Non-interactive:
+./scripts/delete_cloud_run.sh --yes
+```
+
 ## Roadmap
 
 - v0.1 - Query Fan-Out
