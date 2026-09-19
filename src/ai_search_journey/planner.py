@@ -7,7 +7,7 @@ from google.genai import types
 from pydantic import BaseModel, Field
 
 from ai_search_journey.config import settings
-from ai_search_journey.models import SearchIntent
+from ai_search_journey.models import IntentType, SearchIntent
 
 
 class GeminiIntentResponse(BaseModel):
@@ -17,6 +17,7 @@ class GeminiIntentResponse(BaseModel):
     unsupported schema keywords (e.g. exclusiveMinimum) in Gemini's schema parser.
     """
 
+    intent_types: list[str] = Field(default_factory=list)
     category: Optional[str] = None
     reference_location: Optional[str] = None
     group_size: Optional[int] = None
@@ -30,7 +31,18 @@ class GeminiIntentResponse(BaseModel):
 SYSTEM_INSTRUCTION = (
     "You are an expert search intent parser. Analyze the user's natural language request "
     "for local discovery and extract a structured SearchIntent payload.\n\n"
-    "Rules:\n"
+    "Intent Classification Guidelines (Multi-Label):\n"
+    "- 'informational': seeking general knowledge, concepts, or explanations "
+    "(e.g., 'How does RAG work?').\n"
+    "- 'navigational': seeking to reach a specific known website, place, or entity.\n"
+    "- 'commercial': evaluating, researching, or comparing local options before deciding.\n"
+    "- 'transactional': seeking to execute an explicit action such as booking, buying, "
+    "or reserving.\n"
+    "- 'local_discovery': discovering local venues, places, or services around a location.\n"
+    "Note: A query can have multiple labels (e.g., finding nearby coffee shops is both "
+    "'commercial' and 'local_discovery'). Do NOT label 'transactional' unless an explicit "
+    "action (e.g. reserve, book) is requested.\n\n"
+    "Extraction Rules:\n"
     "1. Extract only information supported by the user request. "
     "Do not invent missing constraints.\n"
     "2. Separate hard constraints (must-haves such as explicit opening hours, specific dietary "
@@ -96,8 +108,18 @@ async def extract_intent(
     if raw_response is None:
         raise RuntimeError("Gemini API returned an empty or unparseable response.")
 
+    raw_data = raw_response.model_dump()
+
+    typed_intents: list[IntentType] = []
+    for raw_type in raw_data.get("intent_types", []):
+        try:
+            typed_intents.append(IntentType(raw_type.strip().lower()))
+        except ValueError:
+            pass
+    raw_data["intent_types"] = typed_intents
+
     try:
-        return SearchIntent.model_validate(raw_response.model_dump())
+        return SearchIntent.model_validate(raw_data)
     except Exception as exc:
         raise RuntimeError(
             f"Extracted intent failed domain validation: {exc}"

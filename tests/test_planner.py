@@ -6,13 +6,14 @@ import pytest
 from pydantic import ValidationError
 
 from ai_search_journey.config import settings
-from ai_search_journey.models import SearchIntent
+from ai_search_journey.models import IntentType, SearchIntent
 from ai_search_journey.planner import GeminiIntentResponse, extract_intent
 
 
 def test_gemini_intent_response_conversion_to_search_intent() -> None:
     """Verify valid GeminiIntentResponse converts successfully to canonical SearchIntent."""
     raw = GeminiIntentResponse(
+        intent_types=["commercial", "local_discovery"],
         category="coffee shop",
         reference_location="Geekdom San Antonio",
         group_size=6,
@@ -21,7 +22,11 @@ def test_gemini_intent_response_conversion_to_search_intent() -> None:
         preferences=["quiet"],
         requested_result_count=3,
     )
-    intent = SearchIntent.model_validate(raw.model_dump())
+    raw_data = raw.model_dump()
+    raw_data["intent_types"] = [IntentType(t) for t in raw_data["intent_types"]]
+    intent = SearchIntent.model_validate(raw_data)
+    assert IntentType.COMMERCIAL in intent.intent_types
+    assert IntentType.LOCAL_DISCOVERY in intent.intent_types
     assert intent.category == "coffee shop"
     assert intent.group_size == 6
     assert intent.requested_result_count == 3
@@ -42,9 +47,66 @@ def test_invalid_requested_result_count_zero_rejected_by_search_intent() -> None
 
 
 @pytest.mark.asyncio
+async def test_extract_intent_informational_mocked() -> None:
+    """Verify informational request intent extraction."""
+    expected_response = GeminiIntentResponse(
+        intent_types=["informational"],
+        category=None,
+    )
+
+    mock_response = MagicMock()
+    mock_response.parsed = expected_response
+
+    mock_client = MagicMock()
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+
+    result = await extract_intent("How does RAG work?", client=mock_client)
+    assert IntentType.INFORMATIONAL in result.intent_types
+
+
+@pytest.mark.asyncio
+async def test_extract_intent_navigational_mocked() -> None:
+    """Verify navigational request intent extraction."""
+    expected_response = GeminiIntentResponse(
+        intent_types=["navigational"],
+        reference_location="Geekdom",
+    )
+
+    mock_response = MagicMock()
+    mock_response.parsed = expected_response
+
+    mock_client = MagicMock()
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+
+    result = await extract_intent("Open the Geekdom website", client=mock_client)
+    assert IntentType.NAVIGATIONAL in result.intent_types
+
+
+@pytest.mark.asyncio
+async def test_extract_intent_transactional_local_mocked() -> None:
+    """Verify transactional + local discovery intent extraction."""
+    expected_response = GeminiIntentResponse(
+        intent_types=["transactional", "local_discovery"],
+        group_size=8,
+        hard_constraints=["reserve table"],
+    )
+
+    mock_response = MagicMock()
+    mock_response.parsed = expected_response
+
+    mock_client = MagicMock()
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+
+    result = await extract_intent("Reserve a table for 8 tonight", client=mock_client)
+    assert IntentType.TRANSACTIONAL in result.intent_types
+    assert IntentType.LOCAL_DISCOVERY in result.intent_types
+
+
+@pytest.mark.asyncio
 async def test_extract_intent_coffee_shop_mocked() -> None:
     """Verify coffee shop request intent extraction with mocked Gemini response."""
     raw_response = GeminiIntentResponse(
+        intent_types=["commercial", "local_discovery"],
         category="coffee shop",
         reference_location="Geekdom San Antonio",
         group_size=6,
@@ -67,6 +129,8 @@ async def test_extract_intent_coffee_shop_mocked() -> None:
 
     result = await extract_intent(question, client=mock_client)
 
+    assert IntentType.COMMERCIAL in result.intent_types
+    assert IntentType.LOCAL_DISCOVERY in result.intent_types
     assert result.category == "coffee shop"
     assert result.reference_location == "Geekdom San Antonio"
     assert result.group_size == 6
@@ -80,6 +144,7 @@ async def test_extract_intent_coffee_shop_mocked() -> None:
 async def test_extract_intent_indian_restaurant_mocked() -> None:
     """Verify Indian restaurant request intent extraction with mocked response."""
     raw_response = GeminiIntentResponse(
+        intent_types=["commercial", "local_discovery"],
         category="Indian restaurant",
         reference_location="Trinity University",
         group_size=8,
@@ -102,6 +167,8 @@ async def test_extract_intent_indian_restaurant_mocked() -> None:
 
     result = await extract_intent(question, client=mock_client)
 
+    assert IntentType.COMMERCIAL in result.intent_types
+    assert IntentType.LOCAL_DISCOVERY in result.intent_types
     assert result.category == "Indian restaurant"
     assert result.reference_location == "Trinity University"
     assert result.group_size == 8
@@ -150,3 +217,4 @@ async def test_extract_intent_real_gemini_integration() -> None:
     intent = await extract_intent(question)
     assert intent.category is not None
     assert "coffee" in intent.category.lower()
+    assert len(intent.intent_types) > 0

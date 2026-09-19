@@ -6,9 +6,20 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+class IntentType(str, Enum):
+    """Multi-label classification of user search intent."""
+
+    INFORMATIONAL = "informational"
+    NAVIGATIONAL = "navigational"
+    COMMERCIAL = "commercial"
+    TRANSACTIONAL = "transactional"
+    LOCAL_DISCOVERY = "local_discovery"
+
+
 class SearchIntent(BaseModel):
     """Structured intent extracted from the user's natural language request."""
 
+    intent_types: list[IntentType] = Field(default_factory=list)
     category: Optional[str] = None
     reference_location: Optional[str] = None
     group_size: Optional[int] = Field(default=None, gt=0)

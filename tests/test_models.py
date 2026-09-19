@@ -11,6 +11,7 @@ from ai_search_journey.models import (
     EvidenceSource,
     FanoutQuery,
     GroundedAnswer,
+    IntentType,
     JourneyResult,
     RankedCandidate,
     SearchIntent,
@@ -18,9 +19,19 @@ from ai_search_journey.models import (
 )
 
 
+def test_intent_type_enum_values() -> None:
+    """Verify IntentType enum members."""
+    assert IntentType.INFORMATIONAL.value == "informational"
+    assert IntentType.NAVIGATIONAL.value == "navigational"
+    assert IntentType.COMMERCIAL.value == "commercial"
+    assert IntentType.TRANSACTIONAL.value == "transactional"
+    assert IntentType.LOCAL_DISCOVERY.value == "local_discovery"
+
+
 def test_search_intent_coffee_shop_scenario() -> None:
     """Test creating SearchIntent for coffee shop request."""
     intent = SearchIntent(
+        intent_types=[IntentType.COMMERCIAL, IntentType.LOCAL_DISCOVERY],
         category="coffee shop",
         reference_location="Geekdom San Antonio",
         group_size=6,
@@ -29,6 +40,8 @@ def test_search_intent_coffee_shop_scenario() -> None:
         preferences=["quiet", "work-friendly"],
         requested_result_count=3,
     )
+    assert IntentType.COMMERCIAL in intent.intent_types
+    assert IntentType.LOCAL_DISCOVERY in intent.intent_types
     assert intent.category == "coffee shop"
     assert intent.reference_location == "Geekdom San Antonio"
     assert intent.group_size == 6
@@ -40,6 +53,7 @@ def test_search_intent_coffee_shop_scenario() -> None:
 def test_search_intent_indian_restaurant_scenario() -> None:
     """Test creating SearchIntent for Indian restaurant request (generic schema verification)."""
     intent = SearchIntent(
+        intent_types=[IntentType.COMMERCIAL, IntentType.LOCAL_DISCOVERY],
         category="Indian restaurant",
         reference_location="Trinity University",
         group_size=8,
@@ -48,6 +62,8 @@ def test_search_intent_indian_restaurant_scenario() -> None:
         preferences=["vegetarian options"],
         requested_result_count=3,
     )
+    assert IntentType.COMMERCIAL in intent.intent_types
+    assert IntentType.LOCAL_DISCOVERY in intent.intent_types
     assert intent.category == "Indian restaurant"
     assert intent.reference_location == "Trinity University"
     assert intent.group_size == 8
@@ -87,6 +103,7 @@ def test_constraint_status_enum_values() -> None:
 def test_full_journey_result_construction() -> None:
     """Verify constructing a full nested JourneyResult with synthetic data."""
     intent = SearchIntent(
+        intent_types=[IntentType.COMMERCIAL, IntentType.LOCAL_DISCOVERY],
         category="coffee shop",
         reference_location="Geekdom San Antonio",
         group_size=6,

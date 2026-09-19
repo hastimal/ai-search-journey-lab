@@ -1,5 +1,6 @@
 """AI Search Journey package initialization."""
 
+from ai_search_journey.fanout import generate_fanout
 from ai_search_journey.models import (
     Candidate,
     ConstraintResult,
@@ -8,6 +9,7 @@ from ai_search_journey.models import (
     EvidenceSource,
     FanoutQuery,
     GroundedAnswer,
+    IntentType,
     JourneyResult,
     RankedCandidate,
     SearchIntent,
@@ -18,6 +20,7 @@ from ai_search_journey.planner import extract_intent
 __version__ = "0.1.0"
 
 __all__ = [
+    "IntentType",
     "SearchIntent",
     "ToolName",
     "FanoutQuery",
@@ -30,4 +33,5 @@ __all__ = [
     "GroundedAnswer",
     "JourneyResult",
     "extract_intent",
+    "generate_fanout",
 ]
