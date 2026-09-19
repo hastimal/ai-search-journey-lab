@@ -46,6 +46,32 @@ class FanoutQuery(BaseModel):
     reason: Optional[str] = None
 
 
+class SearchSource(BaseModel):
+    """A web source returned by Google Search grounding."""
+
+    title: Optional[str] = None
+    url: str
+
+
+class SearchCitation(BaseModel):
+    """A text segment grounding support mapping to web source chunks."""
+
+    start_index: Optional[int] = None
+    end_index: Optional[int] = None
+    source_indices: list[int] = Field(default_factory=list)
+    cited_text: Optional[str] = None
+
+
+class SearchGroundingResult(BaseModel):
+    """Result of executing a google_search task with Gemini + Google Search Grounding."""
+
+    planner_query: str
+    grounded_text: str
+    executed_search_queries: list[str] = Field(default_factory=list)
+    sources: list[SearchSource] = Field(default_factory=list)
+    citations: list[SearchCitation] = Field(default_factory=list)
+
+
 class Candidate(BaseModel):
     """Normalized representation of a local candidate place."""
 
