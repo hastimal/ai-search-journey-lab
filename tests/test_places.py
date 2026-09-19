@@ -166,3 +166,61 @@ async def test_search_places_empty_results() -> None:
 
     candidates = await search_places(task, api_key="test_key", client=mock_client)
     assert candidates == []
+
+
+@pytest.mark.asyncio
+async def test_resolve_reference_location_success() -> None:
+    """Verify resolve_reference_location parses and returns ReferenceLocation correctly."""
+    mock_json = {
+        "places": [
+            {
+                "id": "ChIJ_zX_example_id",
+                "displayName": {"text": "Geekdom", "languageCode": "en"},
+                "formattedAddress": "110 E Houston St 7th floor, San Antonio, TX 78205",
+                "location": {"latitude": 29.4262, "longitude": -98.4925},
+            }
+        ]
+    }
+    mock_response = MagicMock(spec=httpx.Response)
+    mock_response.status_code = 200
+    mock_response.json.return_value = mock_json
+
+    mock_client = MagicMock(spec=httpx.AsyncClient)
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    from ai_search_journey.places import resolve_reference_location
+
+    ref_loc = await resolve_reference_location(
+        "Geekdom San Antonio",
+        api_key="test_key",
+        client=mock_client,
+    )
+
+    assert ref_loc is not None
+    assert ref_loc.query == "Geekdom San Antonio"
+    assert ref_loc.name == "Geekdom"
+    assert ref_loc.place_id == "ChIJ_zX_example_id"
+    assert ref_loc.latitude == 29.4262
+    assert ref_loc.longitude == -98.4925
+    assert ref_loc.formatted_address == "110 E Houston St 7th floor, San Antonio, TX 78205"
+
+
+@pytest.mark.asyncio
+async def test_resolve_reference_location_not_found() -> None:
+    """Verify resolve_reference_location returns None when places list is empty."""
+    mock_response = MagicMock(spec=httpx.Response)
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"places": []}
+
+    mock_client = MagicMock(spec=httpx.AsyncClient)
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    from ai_search_journey.places import resolve_reference_location
+
+    ref_loc = await resolve_reference_location(
+        "Nonexistent Place 12345",
+        api_key="test_key",
+        client=mock_client,
+    )
+    assert ref_loc is None
+

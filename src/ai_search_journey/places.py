@@ -5,7 +5,7 @@ from typing import Any, Optional
 import httpx
 
 from ai_search_journey.config import settings
-from ai_search_journey.models import Candidate, FanoutQuery, ToolName
+from ai_search_journey.models import Candidate, FanoutQuery, ReferenceLocation, ToolName
 
 PLACES_SEARCH_TEXT_URL = "https://places.googleapis.com/v1/places:searchText"
 
@@ -20,6 +20,95 @@ FIELD_MASK = (
     "places.websiteUri,"
     "places.googleMapsUri"
 )
+
+
+async def resolve_reference_location(
+    location_query: str,
+    *,
+    api_key: Optional[str] = None,
+    client: Optional[httpx.AsyncClient] = None,
+) -> Optional[ReferenceLocation]:
+    """Resolve a natural language reference location name to coordinates using Places API (New).
+
+    Args:
+        location_query: Natural language reference location query.
+        api_key: Optional Google Maps API Key override.
+        client: Optional httpx.AsyncClient instance for dependency injection.
+
+    Returns:
+        ReferenceLocation instance with lat/lng and place details, or None if unresolvable.
+    """
+    if not location_query or not location_query.strip():
+        return None
+
+    effective_api_key = api_key or settings.google_maps_api_key
+    if not effective_api_key or effective_api_key == "your_google_maps_api_key_here":
+        raise ValueError("GOOGLE_MAPS_API_KEY environment variable is not configured.")
+
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": effective_api_key,
+        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location",
+    }
+
+    payload = {
+        "textQuery": location_query.strip(),
+        "maxResultCount": 1,
+    }
+
+    should_close_client = False
+    if client is None:
+        client = httpx.AsyncClient(timeout=10.0)
+        should_close_client = True
+
+    try:
+        response = await client.post(
+            PLACES_SEARCH_TEXT_URL,
+            headers=headers,
+            json=payload,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Google Places reference location lookup failed: {exc}") from exc
+    finally:
+        if should_close_client:
+            await client.aclose()
+
+    if response.status_code != 200:
+        return None
+
+    try:
+        data: dict[str, Any] = response.json()
+    except Exception:
+        return None
+
+    places = data.get("places", [])
+    if not places:
+        return None
+
+    raw = places[0]
+    place_id = raw.get("id")
+    location = raw.get("location", {})
+    lat = location.get("latitude")
+    lng = location.get("longitude")
+
+    if not place_id or lat is None or lng is None:
+        return None
+
+    display_name = raw.get("displayName", {})
+    name = (
+        display_name.get("text", location_query)
+        if isinstance(display_name, dict)
+        else location_query
+    )
+
+    return ReferenceLocation(
+        query=location_query,
+        place_id=str(place_id),
+        name=str(name),
+        formatted_address=raw.get("formattedAddress"),
+        latitude=float(lat),
+        longitude=float(lng),
+    )
 
 
 async def search_places(

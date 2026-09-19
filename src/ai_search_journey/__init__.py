@@ -26,6 +26,7 @@ from ai_search_journey.models import (
 from ai_search_journey.normalize import is_reference_location, normalize_candidates
 from ai_search_journey.places import search_places
 from ai_search_journey.planner import extract_intent
+from ai_search_journey.ranking import rank_candidates
 from ai_search_journey.search import search_web
 
 __version__ = "0.1.0"
@@ -59,4 +60,5 @@ __all__ = [
     "search_web",
     "aggregate_evidence",
     "evaluate_constraints",
+    "rank_candidates",
 ]

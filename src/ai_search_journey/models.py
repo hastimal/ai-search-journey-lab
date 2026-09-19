@@ -222,12 +222,33 @@ class ConstraintEvaluationResult(BaseModel):
     evaluations: list[CandidateConstraintEvaluation] = Field(default_factory=list)
 
 
+class ReferenceLocation(BaseModel):
+    """Resolved geographic reference location anchor."""
+
+    query: str
+    place_id: str
+    name: str
+    formatted_address: Optional[str] = None
+    latitude: float = Field(ge=-90.0, le=90.0)
+    longitude: float = Field(ge=-180.0, le=180.0)
+
+
 class RankedCandidate(BaseModel):
-    """Candidate place augmented with scoring and constraint match details."""
+    """Candidate place augmented with scoring, proximity, and constraint match details."""
 
     candidate: Candidate
     score: float
+    rank: int = 1
     constraint_results: list[ConstraintResult] = Field(default_factory=list)
+    hard_supported: int = 0
+    hard_unknown: int = 0
+    hard_failed: int = 0
+    preference_supported: int = 0
+    preference_unknown: int = 0
+    preference_failed: int = 0
+    distance_miles: Optional[float] = None
+    proximity_score: float = 0.0
+    quality_score: float = 0.0
     ranking_reasons: list[str] = Field(default_factory=list)
 
 
