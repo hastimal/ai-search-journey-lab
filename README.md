@@ -37,7 +37,34 @@ User Intent ──▶ Query Fan-Out ──▶ Multi-Source Retrieval ──▶ G
 
 ---
 
-## 2. Capabilities Demonstrated
+## 2. Demo
+
+The Journey Inspector makes the complete AI search journey visible instead of showing only a final recommendation.
+
+It exposes:
+- parsed search intent
+- dynamic planner query fan-out
+- Google Places retrieval
+- executed Google Search grounding queries
+- evidence provenance
+- deterministic constraint evaluation
+- ranking and proximity
+- Top 3 recommendations
+- Google Maps Static API preview
+- grounded final answer
+- ADK developer trace
+- per-step execution timing
+
+![AI Search Journey Lab Demo](assets/ai-search-journey-lab.png)
+
+> **Example Demonstration:** Finding a coffee shop near Geekdom San Antonio for six people to work together, preferably quiet, and open after 8 PM. The UI keeps unsupported or unavailable evidence explicitly marked as unverified (`?` unknown) rather than converting unknowns into false claims.
+
+### Example Query
+
+```text
+Find a coffee shop near Geekdom San Antonio for 6 people ---
+
+## 3. Capabilities Demonstrated
 
 - **Structured Intent Extraction:** Multi-label classification (`informational`, `navigational`, `commercial`, `transactional`, `local_discovery`) with structured extraction of reference locations, categories, operating hours, group sizes, hard constraints, and preferences.
 - **Dynamic Query Fan-Out:** LLM-driven query planner decomposing complex requests into targeted retrieval tasks routed to appropriate tools.
@@ -56,7 +83,7 @@ User Intent ──▶ Query Fan-Out ──▶ Multi-Source Retrieval ──▶ G
 
 ---
 
-## 3. Demo Scenarios
+## 4. Demo Scenarios
 
 The pipeline operates on arbitrary local discovery questions without hardcoded logic.
 
@@ -77,7 +104,7 @@ The pipeline operates on arbitrary local discovery questions without hardcoded l
 
 ---
 
-## 4. Architecture
+## 5. Architecture
 
 ```text
                           User Question
@@ -139,7 +166,7 @@ The pipeline operates on arbitrary local discovery questions without hardcoded l
 
 ---
 
-## 5. Journey Inspector UI
+## 6. Journey Inspector UI
 
 The Journey Inspector UI makes every stage of the AI search pipeline inspectable in real-time rather than treating the model as an opaque black box:
 
@@ -163,7 +190,7 @@ The Journey Inspector UI makes every stage of the AI search pipeline inspectable
 
 ---
 
-## 6. Evidence & Constraint Evaluation Model
+## 7. Evidence & Constraint Evaluation Model
 
 Constraint evaluations are strictly separated into 3 explicit states:
 
@@ -188,7 +215,7 @@ Every evidence item maintains strict source provenance:
 
 ---
 
-## 7. Deterministic Ranking Logic
+## 8. Deterministic Ranking Logic
 
 **LLMs do not choose the winner.** Candidate ranking is computed by deterministic Python logic using explicit scoring rules:
 
@@ -202,7 +229,7 @@ Every evidence item maintains strict source provenance:
 
 ---
 
-## 8. Technology Stack
+## 9. Technology Stack
 
 | Technology | Role in Architecture |
 | :--- | :--- |
@@ -222,11 +249,12 @@ Every evidence item maintains strict source provenance:
 
 ---
 
-## 9. Project Structure
+## 10. Project Structure
 
 ```text
 ai-search-journey-lab/
 ├── assets/                          # UI assets and branding logos
+│   ├── ai-search-journey-lab.png    # Live Journey Inspector screenshot
 │   ├── gdg.svg
 │   ├── gdg.jpeg
 │   └── google-for-startup.webp
@@ -275,7 +303,7 @@ ai-search-journey-lab/
 
 ---
 
-## 10. Local Setup & Testing
+## 11. Local Setup & Testing
 
 ### Prerequisites
 - Python 3.12+
@@ -323,7 +351,7 @@ python -m mypy src
 
 ---
 
-## 11. Running the Journey Inspector Locally
+## 12. Running the Journey Inspector Locally
 
 Launch the Streamlit GUI:
 
@@ -335,7 +363,7 @@ Access the UI at `http://localhost:8501`.
 
 ---
 
-## 12. Running with Docker
+## 13. Running with Docker
 
 ### Build Image
 ```bash
@@ -359,7 +387,7 @@ curl http://localhost:8080/_stcore/health
 
 ---
 
-## 13. Google Cloud Deployment
+## 14. Google Cloud Deployment
 
 The repository provides repeatable automation scripts for deployment to **Google Cloud Run**.
 
@@ -378,6 +406,26 @@ echo -n "YOUR_GOOGLE_MAPS_API_KEY" | gcloud secrets versions add google-maps-api
 
 ### 2. Deploy or Update
 Builds the `linux/amd64` container image using Docker Buildx, pushes to Artifact Registry, deploys to Cloud Run with Secret Manager mounting, and runs a health check:
+
+```bash
+./scripts/deploy_cloud_run.sh
+```
+
+### 3. Safe Cleanup
+Removes the Cloud Run service and Artifact Registry container images while preserving secrets, the repository, and the service account:
+
+```bash
+# Interactive confirmation:
+./scripts/delete_cloud_run.sh
+
+# Non-interactive:
+./scripts/delete_cloud_run.sh --yes
+```
+
+---
+
+## 15. Design Principles
+pushes to Artifact Registry, deploys to Cloud Run with Secret Manager mounting, and runs a health check:
 
 ```bash
 ./scripts/deploy_cloud_run.sh
