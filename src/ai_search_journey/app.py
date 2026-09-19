@@ -163,7 +163,6 @@ def render_app() -> None:
                     caption=f"Google Maps Static API Preview ({marker_cnt} markers: A, B, C)",
                     use_container_width=True,
                 )
-                st.caption(f"**Static Map URL:** `{journey.static_map.redacted_url}`")
             else:
                 st.info("No static map available for the ranked results.")
 
