@@ -251,3 +251,105 @@ async def test_adk_does_not_fabricate_candidates_or_convert_unknown() -> None:
         group_res = [r for r in results if "Group size" in r.constraint]
         assert len(group_res) == 1
         assert group_res[0].status == ConstraintStatus.UNKNOWN
+
+
+@pytest.mark.asyncio
+async def test_adk_step_timing_transitions_and_trace() -> None:
+    """Verify step transitions (pending -> running -> completed), non-negative duration, trace."""
+    sample_intent = SearchIntent(category="coffee shop")
+    c1 = Candidate(place_id="c1", name="Place 1", primary_type="coffee_shop")
+
+    updates_received: list[tuple[str, str]] = []
+
+    def on_step(step: object, trace: object) -> None:
+        if step is not None:
+            k = getattr(step, "key", "")
+            st = getattr(step, "status", "")
+            val = getattr(st, "value", str(st))
+            updates_received.append((k, val))
+
+    with (
+        patch(
+            "ai_search_journey.adk.agent.extract_intent", new_callable=AsyncMock
+        ) as mock_intent,
+        patch(
+            "ai_search_journey.adk.agent.reference_location_tool", new_callable=AsyncMock
+        ) as mock_ref,
+        patch(
+            "ai_search_journey.adk.agent.generate_fanout", new_callable=AsyncMock
+        ) as mock_fanout,
+        patch(
+            "ai_search_journey.adk.agent.places_retrieval_tool", new_callable=AsyncMock
+        ) as mock_places,
+        patch(
+            "ai_search_journey.adk.agent.search_grounding_tool", new_callable=AsyncMock
+        ) as mock_search,
+        patch(
+            "ai_search_journey.adk.agent.generate_grounded_answer", new_callable=AsyncMock
+        ) as mock_ans,
+    ):
+        mock_intent.return_value = sample_intent
+        mock_ref.return_value = None
+        mock_fanout.return_value = [
+            FanoutQuery(
+                task_id="F1", goal="Discovery", query="coffee", tool=ToolName.GOOGLE_PLACES
+            )
+        ]
+        mock_places.return_value = [c1]
+        mock_search.return_value = SearchGroundingResult(
+            task_id="F2", planner_query="test", grounded_text=""
+        )
+        mock_ans.return_value = GroundedAnswer(summary="Answer", recommendations=[])
+
+        agent = SearchJourneyAgent()
+        journey = await agent.run("Find coffee", on_step_update=on_step)
+
+        # Trace exists and completed
+        assert journey.execution_trace is not None
+        assert journey.execution_trace.is_complete is True
+        assert journey.execution_trace.total_duration_seconds is not None
+        assert journey.execution_trace.total_duration_seconds >= 0.0
+
+        # Steps are all completed and have non-negative durations
+        for st in journey.execution_trace.steps:
+            assert st.status.value == "completed"
+            assert st.duration_seconds is not None
+            assert st.duration_seconds >= 0.0
+            # Ensure no API keys appear in detail or label
+            assert "AIza" not in (st.detail or "")
+            assert "AIza" not in st.label
+
+        # Verify step transitions recorded in callback
+        statuses_by_key: dict[str, list[str]] = {}
+        for k, s in updates_received:
+            statuses_by_key.setdefault(k, []).append(s)
+
+        for key in ["intent", "fanout", "places", "normalize", "ranking", "answer"]:
+            assert "running" in statuses_by_key.get(key, [])
+            assert "completed" in statuses_by_key.get(key, [])
+
+
+@pytest.mark.asyncio
+async def test_adk_step_failure_captured_in_trace() -> None:
+    """Verify failing step is marked as failed and trace captures failed_step_key."""
+    with patch(
+        "ai_search_journey.adk.agent.extract_intent", new_callable=AsyncMock
+    ) as mock_intent:
+        mock_intent.side_effect = RuntimeError("Gemini API connection error")
+
+        agent = SearchJourneyAgent()
+        last_trace = None
+
+        def on_step(step: object, trace: object) -> None:
+            nonlocal last_trace
+            last_trace = trace
+
+        with pytest.raises(RuntimeError, match="Gemini API connection error"):
+            await agent.run("Find coffee", on_step_update=on_step)
+
+        assert last_trace is not None
+        assert last_trace.failed_step_key == "intent"
+        intent_step = [s for s in last_trace.steps if s.key == "intent"][0]
+        assert intent_step.status.value == "failed"
+        assert "Gemini API connection error" in (intent_step.error or "")
+

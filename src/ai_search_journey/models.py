@@ -306,6 +306,35 @@ class GroundedAnswer(BaseModel):
     citations: list[str] = Field(default_factory=list)
 
 
+class StepExecutionStatus(str, Enum):
+    """Execution status of an individual search journey step."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class JourneyStepTiming(BaseModel):
+    """Execution timing and detail for an individual journey step."""
+
+    key: str
+    label: str
+    status: StepExecutionStatus = StepExecutionStatus.PENDING
+    duration_seconds: Optional[float] = None
+    detail: Optional[str] = None
+    error: Optional[str] = None
+
+
+class JourneyExecutionTrace(BaseModel):
+    """Complete structured execution trace and timing across all journey steps."""
+
+    steps: list[JourneyStepTiming] = Field(default_factory=list)
+    total_duration_seconds: Optional[float] = None
+    is_complete: bool = False
+    failed_step_key: Optional[str] = None
+
+
 class JourneyResult(BaseModel):
     """Complete end-to-end trace payload of the AI search journey."""
 
@@ -322,6 +351,7 @@ class JourneyResult(BaseModel):
     static_map: Optional[StaticMapResult] = None
     answer: Optional[GroundedAnswer] = None
     trace_steps: list[str] = Field(default_factory=list)
+    execution_trace: Optional[JourneyExecutionTrace] = None
 
     @property
     def fanout_queries(self) -> list[FanoutQuery]:
@@ -337,5 +367,6 @@ class JourneyResult(BaseModel):
     def grounded_answer(self) -> Optional[GroundedAnswer]:
         """Alias for answer."""
         return self.answer
+
 
 
