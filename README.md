@@ -57,12 +57,19 @@ It exposes:
 
 ![AI Search Journey Lab Demo](assets/ai-search-journey-lab.png)
 
-> **Example Demonstration:** Finding a coffee shop near Geekdom San Antonio for six people to work together, preferably quiet, and open after 8 PM. The UI keeps unsupported or unavailable evidence explicitly marked as unverified (`?` unknown) rather than converting unknowns into false claims.
+> **Example:** Finding a coffee shop near Geekdom San Antonio for six people to work together, preferably quiet, and open after 8 PM. The UI keeps unsupported or unavailable evidence explicitly marked as unverified (`?` unknown) rather than converting unknowns into false claims.
+>
+> **Execution Summary:** `✅ Search Journey Complete · 53.0s`
+>
+> In this example, the complete journey finished in approximately 53 seconds. The execution panel is collapsible, making it easy to switch between the final recommendations (high-level result view) and the underlying intent extraction, fan-out, retrieval, grounding, evidence aggregation, constraint evaluation, and ranking steps (detailed execution trace). Runtime varies between executions because external retrieval and Google Search grounding calls are live.
 
 ### Example Query
 
 ```text
-Find a coffee shop near Geekdom San Antonio for 6 people ---
+Find a coffee shop near Geekdom San Antonio for 6 people to work together, preferably quiet, and open after 8 PM.
+```
+
+---
 
 ## 3. Capabilities Demonstrated
 
@@ -421,36 +428,6 @@ Removes the Cloud Run service and Artifact Registry container images while prese
 # Non-interactive:
 ./scripts/delete_cloud_run.sh --yes
 ```
-
----
-
-## 15. Design Principles
-pushes to Artifact Registry, deploys to Cloud Run with Secret Manager mounting, and runs a health check:
-
-```bash
-./scripts/deploy_cloud_run.sh
-```
-
-### 3. Safe Cleanup
-Removes the Cloud Run service and Artifact Registry container images while preserving secrets, the repository, and the service account:
-
-```bash
-# Interactive confirmation:
-./scripts/delete_cloud_run.sh
-
-# Non-interactive:
-./scripts/delete_cloud_run.sh --yes
-```
-
----
-
-## 14. Screenshots & Demo Walkthrough
-
-<!-- Add Journey Inspector Overview screenshot -->
-<!-- Add Live Execution Timeline screenshot -->
-<!-- Add Planner Query Fan-Out screenshot -->
-<!-- Add Multi-Source Constraint Matrix screenshot -->
-<!-- Add Top 3 Recommendations & Static Map screenshot -->
 
 ---
 
