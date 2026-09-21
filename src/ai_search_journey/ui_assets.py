@@ -196,7 +196,7 @@ def render_app_title(
             font-size: 0.95rem;
             line-height: 1.5;
             color: rgba(250, 250, 250, 0.7);
-            margin: 6px 0 14px 0;
+            margin: 6px 0 34px 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
                 Roboto, Helvetica, Arial, sans-serif;
         }}
