@@ -4,6 +4,7 @@ Provides clean logo rendering in the header with auto-cropping using images from
 """
 
 import base64
+import textwrap
 from io import BytesIO
 from pathlib import Path
 from typing import Optional
@@ -110,7 +111,7 @@ def render_header_logos() -> None:
         if gdg_uri:
             elements.append(
                 f'<img src="{gdg_uri}" alt="GDG" '
-                'style="height: 24px; width: auto; object-fit: contain; '
+                'style="height: 36px; width: auto; object-fit: contain; '
                 'display: inline-block; vertical-align: middle;" />'
             )
     elif gdg_jpeg:
@@ -120,7 +121,7 @@ def render_header_logos() -> None:
             if gdg_uri:
                 elements.append(
                     f'<img src="{gdg_uri}" alt="GDG" '
-                    'style="height: 24px; width: auto; object-fit: contain; '
+                    'style="height: 36px; width: auto; object-fit: contain; '
                     'display: inline-block; vertical-align: middle;" />'
                 )
 
@@ -129,17 +130,129 @@ def render_header_logos() -> None:
         if google_uri:
             elements.append(
                 f'<img src="{google_uri}" alt="Google for Startups" '
-                'style="height: 20px; width: auto; object-fit: contain; '
+                'style="height: 30px; width: auto; object-fit: contain; '
                 'display: inline-block; vertical-align: middle;" />'
             )
 
     if not elements:
         return
 
-    html_content = (
-        '<div style="display: flex; align-items: center; gap: 14px; '
-        f'margin-bottom: 6px;">{"".join(elements)}</div>'
-    )
+    html_content = textwrap.dedent(f"""
+        <style>
+        @keyframes g-rotate-border {{
+            0% {{
+                transform: translate(-50%, -50%) rotate(0deg);
+            }}
+            100% {{
+                transform: translate(-50%, -50%) rotate(360deg);
+            }}
+        }}
+        @keyframes g-sparkle-pulse {{
+            0%, 100% {{
+                box-shadow: 0 0 14px rgba(66, 133, 244, 0.45), 0 0 24px rgba(234, 67, 53, 0.25);
+                filter: brightness(1.0);
+            }}
+            25% {{
+                box-shadow: 0 0 20px rgba(234, 67, 53, 0.6), 0 0 30px rgba(251, 188, 5, 0.35);
+                filter: brightness(1.08);
+            }}
+            50% {{
+                box-shadow: 0 0 18px rgba(251, 188, 5, 0.5), 0 0 28px rgba(52, 168, 83, 0.35);
+                filter: brightness(1.04);
+            }}
+            75% {{
+                box-shadow: 0 0 20px rgba(52, 168, 83, 0.6), 0 0 30px rgba(66, 133, 244, 0.35);
+                filter: brightness(1.08);
+            }}
+        }}
+        @keyframes g-sparkle-sweep {{
+            0% {{
+                left: -140%;
+                opacity: 0;
+            }}
+            20% {{
+                opacity: 0.5;
+            }}
+            45% {{
+                left: 140%;
+                opacity: 0;
+            }}
+            100% {{
+                left: 140%;
+                opacity: 0;
+            }}
+        }}
+        .g-sponsor-badge-outer {{
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2px;
+            border-radius: 14px;
+            overflow: hidden;
+            margin-bottom: 14px;
+            animation: g-sparkle-pulse 3.6s ease-in-out infinite;
+            background: transparent;
+            transition: transform 0.2s ease;
+        }}
+        .g-sponsor-badge-outer:hover {{
+            transform: translateY(-1px);
+        }}
+        .g-sponsor-badge-rotating-bg {{
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 350%;
+            aspect-ratio: 1 / 1;
+            background: conic-gradient(
+                from 0deg,
+                #4285F4 0deg,
+                #EA4335 90deg,
+                #FBBC05 180deg,
+                #34A853 270deg,
+                #4285F4 360deg
+            );
+            animation: g-rotate-border 4s linear infinite;
+            z-index: 1;
+            transform-origin: center center;
+        }}
+        .g-sponsor-badge-inner {{
+            position: relative;
+            z-index: 2;
+            display: inline-flex;
+            align-items: center;
+            gap: 16px;
+            padding: 8px 20px;
+            background: linear-gradient(135deg, #131722 0%, #0d1017 100%);
+            border-radius: 12px;
+            overflow: hidden;
+        }}
+        .g-sponsor-badge-shimmer {{
+            position: absolute;
+            top: 0;
+            left: -140%;
+            width: 80%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                transparent 0%,
+                rgba(255, 255, 255, 0.22) 50%,
+                transparent 100%
+            );
+            transform: skewX(-20deg);
+            animation: g-sparkle-sweep 4.5s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 3;
+        }}
+        </style>
+        <div class="g-sponsor-badge-outer">
+            <div class="g-sponsor-badge-rotating-bg"></div>
+            <div class="g-sponsor-badge-inner">
+                <div class="g-sponsor-badge-shimmer"></div>
+                {"".join(elements)}
+            </div>
+        </div>
+    """).strip()
     st.markdown(html_content, unsafe_allow_html=True)
 
 
