@@ -137,122 +137,108 @@ def render_header_logos() -> None:
     if not elements:
         return
 
+    html_content = (
+        '<div style="display: flex; align-items: center; gap: 16px; '
+        'margin-bottom: 12px;">'
+        f'{"".join(elements)}'
+        '</div>'
+    )
+    st.markdown(html_content, unsafe_allow_html=True)
+
+
+DEFAULT_APP_SUBTITLE = (
+    "See how a question becomes intent, fan-out queries, grounded evidence, "
+    "deterministic constraint evaluation, ranking, and recommendations."
+)
+
+
+def render_app_title(
+    title: str = "🔍 AI Search Journey Lab",
+    subtitle: Optional[str] = DEFAULT_APP_SUBTITLE,
+) -> None:
+    """Render primary title card with compact padding, subtle border, and wrapped subtitle."""
+    subtitle_html = ""
+    if subtitle:
+        subtitle_html = f'<p class="app-header-subtitle">{subtitle}</p>'
+
     html_content = textwrap.dedent(f"""
         <style>
-        @keyframes g-rotate-border {{
-            0% {{
-                transform: translate(-50%, -50%) rotate(0deg);
-            }}
-            100% {{
-                transform: translate(-50%, -50%) rotate(360deg);
-            }}
-        }}
-        @keyframes g-sparkle-pulse {{
-            0%, 100% {{
-                box-shadow: 0 0 14px rgba(66, 133, 244, 0.45), 0 0 24px rgba(234, 67, 53, 0.25);
-                filter: brightness(1.0);
-            }}
-            25% {{
-                box-shadow: 0 0 20px rgba(234, 67, 53, 0.6), 0 0 30px rgba(251, 188, 5, 0.35);
-                filter: brightness(1.08);
-            }}
-            50% {{
-                box-shadow: 0 0 18px rgba(251, 188, 5, 0.5), 0 0 28px rgba(52, 168, 83, 0.35);
-                filter: brightness(1.04);
-            }}
-            75% {{
-                box-shadow: 0 0 20px rgba(52, 168, 83, 0.6), 0 0 30px rgba(66, 133, 244, 0.35);
-                filter: brightness(1.08);
-            }}
-        }}
-        @keyframes g-sparkle-sweep {{
-            0% {{
-                left: -140%;
-                opacity: 0;
-            }}
-            20% {{
-                opacity: 0.5;
-            }}
-            45% {{
-                left: 140%;
-                opacity: 0;
-            }}
-            100% {{
-                left: 140%;
-                opacity: 0;
-            }}
-        }}
-        .g-sponsor-badge-outer {{
-            position: relative;
+        .app-title-container {{
             display: inline-flex;
             align-items: center;
-            justify-content: center;
-            padding: 2px;
-            border-radius: 14px;
-            overflow: hidden;
-            margin-bottom: 14px;
-            animation: g-sparkle-pulse 3.6s ease-in-out infinite;
-            background: transparent;
-            transition: transform 0.2s ease;
-        }}
-        .g-sponsor-badge-outer:hover {{
-            transform: translateY(-1px);
-        }}
-        .g-sponsor-badge-rotating-bg {{
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 350%;
-            aspect-ratio: 1 / 1;
-            background: conic-gradient(
-                from 0deg,
-                #4285F4 0deg,
-                #EA4335 90deg,
-                #FBBC05 180deg,
-                #34A853 270deg,
-                #4285F4 360deg
-            );
-            animation: g-rotate-border 4s linear infinite;
-            z-index: 1;
-            transform-origin: center center;
-        }}
-        .g-sponsor-badge-inner {{
-            position: relative;
-            z-index: 2;
-            display: inline-flex;
-            align-items: center;
-            gap: 16px;
-            padding: 8px 20px;
-            background: linear-gradient(135deg, #131722 0%, #0d1017 100%);
-            border-radius: 12px;
-            overflow: hidden;
-        }}
-        .g-sponsor-badge-shimmer {{
-            position: absolute;
-            top: 0;
-            left: -140%;
-            width: 80%;
-            height: 100%;
+            width: fit-content;
+            max-width: 100%;
+            padding: 6px 16px;
             background: linear-gradient(
-                90deg,
-                transparent 0%,
-                rgba(255, 255, 255, 0.22) 50%,
-                transparent 100%
+                180deg, rgba(30, 34, 45, 0.85) 0%, rgba(18, 22, 30, 0.95) 100%
             );
-            transform: skewX(-20deg);
-            animation: g-sparkle-sweep 4.5s ease-in-out infinite;
-            pointer-events: none;
-            z-index: 3;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            box-shadow: 0 0 18px rgba(66, 133, 244, 0.14),
+                0 2px 6px rgba(0, 0, 0, 0.35),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            margin-top: 0;
+            margin-bottom: 6px;
+        }}
+        .app-title-text {{
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 1.85rem;
+            font-weight: 700;
+            line-height: 1.25;
+            color: #ffffff;
+            letter-spacing: -0.015em;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                Roboto, Helvetica, Arial, sans-serif;
+        }}
+        .app-header-subtitle {{
+            max-width: 680px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: rgba(250, 250, 250, 0.7);
+            margin: 6px 0 14px 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                Roboto, Helvetica, Arial, sans-serif;
+        }}
+        .stTextArea label,
+        .stTextArea label p,
+        .stSelectbox label,
+        .stSelectbox label p,
+        div[data-testid="stWidgetLabel"] label,
+        div[data-testid="stWidgetLabel"] label p {{
+            color: #DADCE0 !important;
+            font-weight: 500 !important;
+            font-size: 0.92rem !important;
+            letter-spacing: -0.005em !important;
+            text-shadow: none !important;
+            box-shadow: none !important;
+            background: none !important;
+            -webkit-text-fill-color: #DADCE0 !important;
         }}
         </style>
-        <div class="g-sponsor-badge-outer">
-            <div class="g-sponsor-badge-rotating-bg"></div>
-            <div class="g-sponsor-badge-inner">
-                <div class="g-sponsor-badge-shimmer"></div>
-                {"".join(elements)}
+        <div>
+            <div class="app-title-container">
+                <h1 class="app-title-text">{title}</h1>
             </div>
+            {subtitle_html}
         </div>
     """).strip()
+    st.markdown(html_content, unsafe_allow_html=True)
+
+
+def render_journey_hint(
+    message: str = "Run the journey to inspect the end-to-end execution.",
+) -> None:
+    """Render a visually quiet, dark neutral helper hint below the run button."""
+    html_content = (
+        '<div style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; '
+        'background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); '
+        'border-radius: 8px; color: rgba(255, 255, 255, 0.72); font-size: 0.88rem; '
+        'line-height: 1.4; margin-top: 6px; margin-bottom: 8px;">'
+        '<span style="font-size: 0.95rem; line-height: 1;">💡</span>'
+        f'<span>{message}</span>'
+        '</div>'
+    )
     st.markdown(html_content, unsafe_allow_html=True)
 
 

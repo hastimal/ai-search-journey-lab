@@ -20,7 +20,9 @@ from ai_search_journey.models import (
     ToolName,
 )
 from ai_search_journey.ui_assets import (
+    render_app_title,
     render_header_logos,
+    render_journey_hint,
 )
 from ai_search_journey.ui_formatters import (
     build_constraint_matrix_data,
@@ -50,15 +52,9 @@ def render_app() -> None:
         initial_sidebar_state="collapsed",
     )
 
-    # 1. Header with GDG & Google for Startups Logos
+    # 1. Header Hierarchy: Clean standalone logo, then primary title card & subtitle
     render_header_logos()
-
-    st.title("🔍 AI Search Journey Lab")
-    st.caption(
-        "See how a question becomes intent, fan-out queries, grounded evidence, "
-        "deterministic constraint evaluation, ranking, and recommendations."
-    )
-    st.write("")
+    render_app_title()
 
     # 2. Input Section
     col_input, col_preset = st.columns([3, 1])
@@ -135,7 +131,7 @@ def render_app() -> None:
 
     journey = st.session_state.journey_result
     if not journey:
-        st.info("💡 Click **Run Search Journey** above to inspect the end-to-end execution.")
+        render_journey_hint()
         return
 
     # 3. Search Journey Complete Collapsible Expander (Default collapsed)

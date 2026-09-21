@@ -182,8 +182,10 @@ def test_ui_assets_fallback_and_loading(tmp_path: object) -> None:
         get_available_branding_assets,
         load_and_autocrop_image,
         load_optional_image,
+        render_app_title,
         render_demo_context,
         render_header_logos,
+        render_journey_hint,
     )
 
     # Missing file returns None gracefully
@@ -226,6 +228,8 @@ def test_ui_assets_fallback_and_loading(tmp_path: object) -> None:
     # Helpers execute without error
     render_demo_context()
     render_header_logos()
+    render_app_title()
+    render_journey_hint()
 
 
 def test_format_step_status_symbol() -> None:
