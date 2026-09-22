@@ -399,6 +399,27 @@ streamlit run src/ai_search_journey/app.py
 
 Access the UI at `http://localhost:8501`.
 
+### Application Architecture: Three Capability Tabs
+
+The Journey Inspector organizes inspection and evaluation into three dedicated capability tabs:
+
+```text
+┌───────────────────────────┬───────────────────────────┬───────────────────────────┐
+│  Search to Decision [V1]  │   Journey Analysis [V2]   │    AI Visibility [V3]     │
+├───────────────────────────┼───────────────────────────┼───────────────────────────┤
+│ • Interactive AI search   │ • Multi-query candidate   │ • Brand presence & SOV    │
+│ • Grounded recommendations│   retrieval provenance    │ • Narrative mention rate  │
+│ • Constraint matrix       │ • Explainable rank        │ • Owned citation analysis │
+│ • Static map preview      │   movement (Δ) tracking   │ • Competitor benchmark    │
+│ • ADK execution trace     │ • Transparent score       │ • BigQuery or in-memory   │
+│                           │   decomposition           │   session history         │
+└───────────────────────────┴───────────────────────────┴───────────────────────────┘
+```
+
+- **Search to Decision [V1]:** End-to-end user-facing search journey from question to grounded recommendations, constraint validation, static map rendering, and live developer execution traces.
+- **Journey Analysis [V2]:** Deep-dive provenance tracking, transparent score breakdowns (hard points, preferences, proximity, penalties), and deterministic rank movement explanations ($\Delta$).
+- **AI Visibility [V3]:** Reuses completed search journeys to quantify brand presence, narrative mention rates, recommendation rates, owned citation rates, and share of voice against competitors.
+
 ---
 
 ## 13. Running with Docker

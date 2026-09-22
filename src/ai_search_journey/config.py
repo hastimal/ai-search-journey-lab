@@ -21,8 +21,18 @@ class Settings(BaseSettings):
     google_maps_api_key: Optional[str] = None
 
     log_level: str = "INFO"
+    bigquery_project: Optional[str] = None
+    bigquery_dataset: str = "ai_search_journey_v3"
+    bigquery_location: str = "US"
 
-    @field_validator("gemini_api_key", "google_maps_api_key", mode="before")
+    @field_validator(
+        "gemini_api_key",
+        "google_maps_api_key",
+        "bigquery_project",
+        "bigquery_dataset",
+        "bigquery_location",
+        mode="before",
+    )
     @classmethod
     def clean_quotes(cls, v: Optional[str]) -> Optional[str]:
         """Strip matching leading/trailing single or double quotes if present."""
