@@ -58,6 +58,13 @@ from ai_search_journey.visibility.repository import (
     InvalidRepositoryFilterError,
     VisibilityRepository,
 )
+from ai_search_journey.visibility.runner import (
+    IncompleteJourneyError,
+    InconsistentScanError,
+    VisibilityRunnerError,
+    VisibilityScanResult,
+    run_visibility_scan,
+)
 
 __all__ = [
     "ALL_TABLES",
@@ -72,6 +79,8 @@ __all__ = [
     "DuplicateScanError",
     "FanoutObservation",
     "InMemoryVisibilityRepository",
+    "IncompleteJourneyError",
+    "InconsistentScanError",
     "InvalidIdentifierError",
     "InvalidRepositoryFilterError",
     "LOCK_KEY_BUNDLE_WRITE",
@@ -86,8 +95,10 @@ __all__ = [
     "VisibilityMetrics",
     "VisibilityProject",
     "VisibilityRepository",
+    "VisibilityRunnerError",
     "VisibilityScan",
     "VisibilityScanBundle",
+    "VisibilityScanResult",
     "VisibilityTrendPoint",
     "build_answer_mention_corpus",
     "calculate_bundle_sha256",
@@ -102,6 +113,7 @@ __all__ = [
     "get_schema_seed_statements",
     "match_candidate_to_brand",
     "normalize_domain",
+    "run_visibility_scan",
     "serialize_bundle_canonically",
     "validate_dataset_id",
     "validate_location",
