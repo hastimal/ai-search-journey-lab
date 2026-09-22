@@ -135,6 +135,203 @@ def init_v3_session_state() -> None:
         st.session_state["v3_custom_competitors"] = []
     if "v3_scan_error" not in st.session_state:
         st.session_state["v3_scan_error"] = None
+    if "v3_cand_multiselect" not in st.session_state:
+        st.session_state["v3_cand_multiselect"] = []
+
+    # Initialize canonical input fields from legacy _input keys if present
+    for key in ("v3_target_name", "v3_target_domain", "v3_target_aliases", "v3_target_place_id"):
+        if key not in st.session_state:
+            st.session_state[key] = st.session_state.get(f"{key}_input", "")
+
+
+def reset_v3_session_state() -> None:
+    """Reset only V3-specific Streamlit session-state keys.
+
+    Clears target fields, selected journey candidates, custom competitors,
+    and prior V3 scan result / validation state without clearing or rerunning
+    the existing V1/V2 JourneyResult.
+    """
+    v3_reset_keys: dict[str, Any] = {
+        "v3_target_name": "",
+        "v3_target_domain": "",
+        "v3_target_aliases": "",
+        "v3_target_place_id": "",
+        "v3_cand_multiselect": [],
+        "v3_custom_competitors": [],
+        "v3_scan_result": None,
+        "v3_scan_error": None,
+        "v3_active_target_id": None,
+        "v3_custom_name": "",
+        "v3_custom_domain": "",
+        "v3_custom_aliases": "",
+        "v3_custom_pid": "",
+    }
+    for k, val in v3_reset_keys.items():
+        st.session_state[k] = val
+
+
+def normalize_brand_name(name: str) -> str:
+    """Normalize brand name for collision checking (lowercase, single space)."""
+    return " ".join(name.strip().lower().split())
+
+
+def build_competitor_profiles(
+    selected_candidate_names: list[str],
+    candidate_lookup: dict[str, Candidate],
+    custom_competitors: list[dict[str, Any]],
+) -> tuple[list[BrandProfile], list[str]]:
+    """Derive competitor BrandProfiles directly from current selections on every rerun.
+
+    Single source of truth: candidate multiselect + custom competitors.
+
+    Returns:
+        tuple[list[BrandProfile], list[str]]: (competitor_profiles, build_errors)
+    """
+    profiles: list[BrandProfile] = []
+    errors: list[str] = []
+
+    # 1. From selected candidates
+    for c_name in selected_candidate_names:
+        cand = candidate_lookup.get(c_name)
+        if not cand:
+            continue
+        c_slug = slugify_brand_name(c_name)
+        c_domain = derive_domain_from_url(cand.website_url)
+        p_ids = [cand.place_id] if cand.place_id else []
+        try:
+            profiles.append(
+                BrandProfile(
+                    brand_id=c_slug,
+                    name=cand.name,
+                    domain=c_domain,
+                    aliases=[],
+                    place_ids=p_ids,
+                )
+            )
+        except Exception:
+            # Fall back without domain if website domain normalization failed
+            try:
+                profiles.append(
+                    BrandProfile(
+                        brand_id=c_slug,
+                        name=cand.name,
+                        domain=None,
+                        aliases=[],
+                        place_ids=p_ids,
+                    )
+                )
+            except Exception as ex:
+                errors.append(f"Invalid candidate competitor '{c_name}': {ex}")
+
+    # 2. From custom competitors
+    for c in custom_competitors:
+        c_name = c.get("name", "").strip()
+        if not c_name:
+            continue
+        c_slug = slugify_brand_name(c_name)
+        try:
+            profiles.append(
+                BrandProfile(
+                    brand_id=c_slug,
+                    name=c_name,
+                    domain=c.get("domain") or None,
+                    aliases=c.get("aliases") or [],
+                    place_ids=[c["place_id"]] if c.get("place_id") else [],
+                )
+            )
+        except Exception as ex:
+            errors.append(f"Invalid custom competitor '{c_name}': {ex}")
+
+    return profiles, errors
+
+
+def validate_scan_inputs(
+    target_name: str,
+    target_domain: Optional[str],
+    target_aliases_raw: str,
+    target_place_id: Optional[str],
+    competitor_profiles: list[BrandProfile],
+    comp_build_errors: list[str],
+) -> tuple[Optional[BrandProfile], list[str]]:
+    """Validate all brand inputs prior to execution.
+
+    Requirements:
+    - Target name alone is sufficient (domain, aliases, place_id optional).
+    - 0 to 3 valid competitors allowed.
+    - Collision check prevents ONLY exact normalized name or identical brand ID.
+    - Lists all actionable validation errors.
+
+    Returns:
+        tuple[Optional[BrandProfile], list[str]]: (target_profile, validation_errors)
+    """
+    errors: list[str] = []
+    target_profile: Optional[BrandProfile] = None
+
+    # Target Name is required & alone sufficient
+    clean_target_name = target_name.strip()
+    if not clean_target_name:
+        errors.append("Target Brand Name is required. Please enter a brand name.")
+    else:
+        target_slug = slugify_brand_name(clean_target_name)
+        target_aliases = [a.strip() for a in target_aliases_raw.split(",") if a.strip()]
+        target_pids = (
+            [target_place_id.strip()] if target_place_id and target_place_id.strip() else []
+        )
+        try:
+            target_profile = BrandProfile(
+                brand_id=target_slug,
+                name=clean_target_name,
+                domain=target_domain.strip() if target_domain and target_domain.strip() else None,
+                aliases=target_aliases,
+                place_ids=target_pids,
+            )
+        except Exception as e:
+            errors.append(f"Invalid target brand configuration: {e}")
+
+    # Maximum 3 competitors allowed
+    if len(competitor_profiles) > 3:
+        errors.append(
+            f"Maximum of 3 competitors allowed (currently {len(competitor_profiles)} configured). "
+            "Please remove excess competitors."
+        )
+
+    # Duplicate competitor brand IDs
+    comp_slugs = [cp.brand_id for cp in competitor_profiles]
+    seen_slugs: set[str] = set()
+    dup_slugs: set[str] = set()
+    for s in comp_slugs:
+        if s in seen_slugs:
+            dup_slugs.add(s)
+        seen_slugs.add(s)
+    if dup_slugs:
+        dup_names = ", ".join(f"'{s}'" for s in sorted(dup_slugs))
+        errors.append(
+            f"Duplicate competitor brand ID detected: {dup_names}. Each competitor must be unique."
+        )
+
+    # Target / Competitor Collision
+    # Prevent ONLY an exact normalized target-name or identical brand-ID collision.
+    # Do NOT use broad substring matching.
+    if clean_target_name and target_profile is not None:
+        norm_target = normalize_brand_name(clean_target_name)
+        for cp in competitor_profiles:
+            norm_cp = normalize_brand_name(cp.name)
+            if norm_target == norm_cp:
+                errors.append(
+                    f"Target brand '{clean_target_name}' cannot also be configured as a competitor "
+                    f"(matches competitor '{cp.name}')."
+                )
+            elif target_profile.brand_id == cp.brand_id:
+                errors.append(
+                    f"Target brand ID '{target_profile.brand_id}' conflicts with competitor "
+                    f"brand ID for '{cp.name}'."
+                )
+
+    # Competitor build errors
+    if comp_build_errors:
+        errors.extend(comp_build_errors)
+
+    return target_profile, errors
 
 
 # ======================================================================
@@ -165,6 +362,22 @@ def render_visibility_tab(journey: Optional[JourneyResult]) -> None:
     candidates = extract_journey_candidates(journey, limit=10)
     candidate_lookup = {cand.name: cand for cand in candidates}
 
+    col_cfg_hdr, col_reset_btn = st.columns([3, 1])
+    with col_cfg_hdr:
+        st.markdown("### ⚙️ Brand & Competitor Configuration")
+    with col_reset_btn:
+        if st.button(
+            "↺ Reset V3 configuration",
+            key="v3_btn_reset_config",
+            help=(
+                "Reset all V3 target fields, selected candidates, custom competitors, "
+                "and scan results without affecting the journey."
+            ),
+            use_container_width=True,
+        ):
+            reset_v3_session_state()
+            st.rerun()
+
     col_target, col_competitors = st.columns([1, 1], gap="medium")
 
     # ---------------- Target Brand Configuration ----------------
@@ -174,33 +387,29 @@ def render_visibility_tab(journey: Optional[JourneyResult]) -> None:
 
         target_name = st.text_input(
             "Brand Name *",
-            value=st.session_state.get("v3_target_name", ""),
             placeholder="e.g. Austin Artisan Coffee",
-            key="v3_target_name_input",
+            key="v3_target_name",
             help="Full business or brand name.",
         ).strip()
 
         target_domain_raw = st.text_input(
             "Brand Domain (optional)",
-            value=st.session_state.get("v3_target_domain", ""),
             placeholder="e.g. austinartisan.com",
-            key="v3_target_domain_input",
+            key="v3_target_domain",
             help="Owned domain used to calculate owned citation rates.",
         ).strip()
 
         target_aliases_raw = st.text_input(
             "Brand Aliases (optional, comma-separated)",
-            value=st.session_state.get("v3_target_aliases", ""),
             placeholder="e.g. Artisan Coffee, Austin Artisan",
-            key="v3_target_aliases_input",
+            key="v3_target_aliases",
             help="Alternative names or abbreviations to match narrative mentions.",
         ).strip()
 
         target_place_id = st.text_input(
             "Google Places ID (optional)",
-            value=st.session_state.get("v3_target_place_id", ""),
             placeholder="e.g. ChIJN1t_tDeuEmsRUsoyG83frY4",
-            key="v3_target_place_id_input",
+            key="v3_target_place_id",
             help="Google Places ID for exact retrieval matching.",
         ).strip()
 
@@ -213,7 +422,6 @@ def render_visibility_tab(journey: Optional[JourneyResult]) -> None:
         selected_cand_names: list[str] = st.multiselect(
             "Select from Journey Candidates",
             options=candidate_names,
-            default=[],
             max_selections=3,
             key="v3_cand_multiselect",
             help="Candidates retrieved during the search journey. Select 0 to 3.",
@@ -268,50 +476,20 @@ def render_visibility_tab(journey: Optional[JourneyResult]) -> None:
                         st.rerun()
                 active_custom_names.append(c["name"])
 
-    # Build active competitor profiles list (Candidate-derived + Custom)
-    competitor_profiles: list[BrandProfile] = []
-    comp_build_errors: list[str] = []
-
-    # 1. From selected candidates
-    for c_name in selected_cand_names:
-        cand = candidate_lookup[c_name]
-        c_slug = slugify_brand_name(c_name)
-        c_domain = derive_domain_from_url(cand.website_url)
-        p_ids = [cand.place_id] if cand.place_id else []
-        try:
-            competitor_profiles.append(
-                BrandProfile(
-                    brand_id=c_slug,
-                    name=cand.name,
-                    domain=c_domain,
-                    aliases=[],
-                    place_ids=p_ids,
-                )
-            )
-        except Exception as ex:
-            comp_build_errors.append(f"Invalid candidate competitor '{c_name}': {ex}")
-
-    # 2. From custom competitors
-    for c in custom_competitors:
-        c_slug = slugify_brand_name(c["name"])
-        try:
-            competitor_profiles.append(
-                BrandProfile(
-                    brand_id=c_slug,
-                    name=c["name"],
-                    domain=c.get("domain") or None,
-                    aliases=c.get("aliases") or [],
-                    place_ids=[c["place_id"]] if c.get("place_id") else [],
-                )
-            )
-        except Exception as ex:
-            comp_build_errors.append(f"Invalid custom competitor '{c['name']}': {ex}")
+    # Single Source of Truth: derive competitor profiles directly from current rerun state
+    competitor_profiles, comp_build_errors = build_competitor_profiles(
+        selected_candidate_names=selected_cand_names,
+        candidate_lookup=candidate_lookup,
+        custom_competitors=custom_competitors,
+    )
 
     # Display configured competitors preview
+    st.markdown("**Configured Competitors:**")
     if competitor_profiles:
-        st.markdown("**Configured Competitors:**")
         comp_summary = ", ".join([f"`{cp.name}`" for cp in competitor_profiles])
         st.markdown(comp_summary)
+    else:
+        st.caption("No competitors selected (0–3 competitors allowed).")
 
     # 4. Storage Selection & BigQuery Option
     st.markdown("---")
@@ -343,61 +521,44 @@ def render_visibility_tab(journey: Optional[JourneyResult]) -> None:
                 "and install google-cloud-bigquery."
             )
 
+    # Pre-execution validation
+    target_profile, validation_errors = validate_scan_inputs(
+        target_name=target_name,
+        target_domain=target_domain_raw,
+        target_aliases_raw=target_aliases_raw,
+        target_place_id=target_place_id,
+        competitor_profiles=competitor_profiles,
+        comp_build_errors=comp_build_errors,
+    )
+    is_blocked = len(validation_errors) > 0
+
     # 5. Execution Button & Action
     with col_run:
         st.markdown("### 🚀 Execute Analysis")
         st.caption("Extract visibility observations and calculate brand presence metrics.")
+
+        # Show clear validation box immediately above the button if execution is blocked
+        if is_blocked:
+            error_bullets = "\n".join(f"- {msg}" for msg in validation_errors)
+            st.warning(
+                f"**Cannot run visibility analysis:**\n\n{error_bullets}",
+                icon="⚠️",
+            )
+
         run_scan_clicked = st.button(
             "Run Visibility Analysis",
             type="primary",
             use_container_width=True,
+            disabled=is_blocked,
             key="v3_btn_run_scan",
         )
 
     # Handle Scan Execution
     if run_scan_clicked:
+        if is_blocked or target_profile is None:
+            return
+
         st.session_state["v3_scan_error"] = None
-
-        # Input Validations
-        if not target_name:
-            st.error("⚠️ Target Brand Name is required. Please specify a brand name.")
-            return
-
-        if len(competitor_profiles) > 3:
-            st.error("⚠️ Maximum of 3 competitors allowed. Please remove excess competitors.")
-            return
-
-        target_slug = slugify_brand_name(target_name)
-        comp_slugs = [cp.brand_id for cp in competitor_profiles]
-        if target_slug in comp_slugs:
-            st.error(
-                f"⚠️ Target brand '{target_name}' cannot also be configured as a competitor."
-            )
-            return
-
-        if len(comp_slugs) != len(set(comp_slugs)):
-            st.error("⚠️ Duplicate competitor brands detected. Each competitor must be unique.")
-            return
-
-        if comp_build_errors:
-            for err in comp_build_errors:
-                st.error(f"⚠️ {err}")
-            return
-
-        # Build Target Brand Profile
-        target_aliases = [a.strip() for a in target_aliases_raw.split(",") if a.strip()]
-        target_pids = [target_place_id] if target_place_id else []
-        try:
-            target_profile = BrandProfile(
-                brand_id=target_slug,
-                name=target_name,
-                domain=target_domain_raw or None,
-                aliases=target_aliases,
-                place_ids=target_pids,
-            )
-        except Exception as e:
-            st.error(f"⚠️ Invalid target brand configuration: {e}")
-            return
 
         # Select Repository
         repository: VisibilityRepository
