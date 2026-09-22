@@ -7,7 +7,11 @@ from ai_search_journey.adk import (
 )
 from ai_search_journey.answer import generate_grounded_answer
 from ai_search_journey.constraints import evaluate_constraints
-from ai_search_journey.evidence import aggregate_evidence
+from ai_search_journey.evidence import (
+    aggregate_evidence,
+    calculate_citation_coverage,
+    calculate_evidence_coverage,
+)
 from ai_search_journey.fanout import generate_fanout
 from ai_search_journey.models import (
     Candidate,
@@ -28,6 +32,8 @@ from ai_search_journey.models import (
     MapMarker,
     RankedCandidate,
     ReferenceLocation,
+    RetrievalOccurrence,
+    ScoreBreakdown,
     SearchCitation,
     SearchGroundingResult,
     SearchIntent,
@@ -38,7 +44,7 @@ from ai_search_journey.models import (
 from ai_search_journey.normalize import is_reference_location, normalize_candidates
 from ai_search_journey.places import resolve_reference_location, search_places
 from ai_search_journey.planner import extract_intent
-from ai_search_journey.ranking import rank_candidates
+from ai_search_journey.ranking import generate_movement_explanation, rank_candidates
 from ai_search_journey.search import search_web
 from ai_search_journey.static_map import (
     build_static_map_url,
@@ -46,7 +52,7 @@ from ai_search_journey.static_map import (
     redact_api_key_in_url,
 )
 
-__version__ = "0.1.0"
+__version__ = "2.0.0"
 
 __all__ = [
     "IntentType",
@@ -57,6 +63,7 @@ __all__ = [
     "SearchCitation",
     "SearchGroundingResult",
     "Candidate",
+    "RetrievalOccurrence",
     "CandidateEvidence",
     "EvidenceSource",
     "Evidence",
@@ -68,6 +75,7 @@ __all__ = [
     "ConstraintEvaluationResult",
     "ReferenceLocation",
     "RankedCandidate",
+    "ScoreBreakdown",
     "MapMarker",
     "StaticMapResult",
     "FinalRecommendation",
@@ -81,8 +89,11 @@ __all__ = [
     "normalize_candidates",
     "search_web",
     "aggregate_evidence",
+    "calculate_evidence_coverage",
+    "calculate_citation_coverage",
     "evaluate_constraints",
     "rank_candidates",
+    "generate_movement_explanation",
     "build_static_map_url",
     "generate_static_map",
     "redact_api_key_in_url",

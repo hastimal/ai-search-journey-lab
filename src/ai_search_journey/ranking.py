@@ -11,6 +11,7 @@ from ai_search_journey.models import (
     ConstraintStatus,
     RankedCandidate,
     ReferenceLocation,
+    ScoreBreakdown,
 )
 
 # Deterministic Scoring Constants
@@ -97,6 +98,61 @@ def _format_source_label(result: ConstraintResult) -> str:
     return ", ".join(sources)
 
 
+def generate_movement_explanation(r: RankedCandidate) -> str:
+    """Generate a deterministic human-readable explanation of why a candidate moved up or down."""
+    if r.best_retrieval_position is None:
+        return "Direct recommendation (no Places retrieval position recorded)."
+
+    ret_pos = r.best_retrieval_position
+    rec_pos = r.final_recommendation_position
+    diff = ret_pos - rec_pos
+
+    factors: list[str] = []
+    if r.hard_supported > 0:
+        pts = (
+            r.score_breakdown.hard_constraint_points
+            if r.score_breakdown
+            else r.hard_supported * HARD_SUPPORTED_WEIGHT
+        )
+        factors.append(f"{r.hard_supported} hard constraints satisfied (+{pts:.0f} pts)")
+    if r.hard_failed > 0:
+        pens = (
+            r.score_breakdown.penalties
+            if r.score_breakdown
+            else r.hard_failed * HARD_NOT_SATISFIED_WEIGHT
+        )
+        factors.append(f"{r.hard_failed} constraints penalized ({pens:.0f} pts)")
+    if r.preference_supported > 0:
+        ppts = (
+            r.score_breakdown.preference_points
+            if r.score_breakdown
+            else r.preference_supported * PREFERENCE_SUPPORTED_WEIGHT
+        )
+        factors.append(f"{r.preference_supported} preferences matched (+{ppts:.0f} pts)")
+    if r.proximity_score > 0.0:
+        factors.append(f"+{r.proximity_score:.1f} proximity bonus")
+    if r.quality_score > 0.0:
+        factors.append(f"+{r.quality_score:.1f} rating/review quality bonus")
+
+    factor_str = ", ".join(factors) if factors else "overall score"
+
+    if diff > 0:
+        return (
+            f"Moved up {diff} positions from Places retrieval #{ret_pos} "
+            f"to Recommendation #{rec_pos} driven by {factor_str}."
+        )
+    elif diff < 0:
+        return (
+            f"Moved down {abs(diff)} positions from Places retrieval #{ret_pos} "
+            f"to Recommendation #{rec_pos} due to {factor_str}."
+        )
+    else:
+        return (
+            f"Maintained position at #{rec_pos} from Places retrieval to Recommendation "
+            f"({factor_str})."
+        )
+
+
 def _evaluate_single_candidate(
     candidate_eval: CandidateConstraintEvaluation,
     reference_location: Optional[ReferenceLocation] = None,
@@ -112,6 +168,10 @@ def _evaluate_single_candidate(
     preference_unknown = 0
     preference_failed = 0
 
+    hard_constraint_points = 0.0
+    preference_points = 0.0
+    penalties = 0.0
+
     score = 0.0
     reasons: list[str] = []
 
@@ -122,11 +182,13 @@ def _evaluate_single_candidate(
         if is_pref:
             if r.status == ConstraintStatus.SUPPORTED:
                 preference_supported += 1
+                preference_points += PREFERENCE_SUPPORTED_WEIGHT
                 score += PREFERENCE_SUPPORTED_WEIGHT
                 src_label = _format_source_label(r)
                 reasons.append(f"Satisfies preference '{clean_name}' (supported by {src_label}).")
             elif r.status == ConstraintStatus.NOT_SATISFIED:
                 preference_failed += 1
+                penalties += PREFERENCE_NOT_SATISFIED_WEIGHT
                 score += PREFERENCE_NOT_SATISFIED_WEIGHT
                 reasons.append(f"Fails preference '{clean_name}'.")
             else:
@@ -135,6 +197,7 @@ def _evaluate_single_candidate(
         else:
             if r.status == ConstraintStatus.SUPPORTED:
                 hard_supported += 1
+                hard_constraint_points += HARD_SUPPORTED_WEIGHT
                 score += HARD_SUPPORTED_WEIGHT
                 src_label = _format_source_label(r)
                 reasons.append(
@@ -142,6 +205,7 @@ def _evaluate_single_candidate(
                 )
             elif r.status == ConstraintStatus.NOT_SATISFIED:
                 hard_failed += 1
+                penalties += HARD_NOT_SATISFIED_WEIGHT
                 score += HARD_NOT_SATISFIED_WEIGHT
                 reasons.append(
                     f"Penalized because hard constraint '{clean_name}' is not satisfied "
@@ -201,6 +265,15 @@ def _evaluate_single_candidate(
             )
             break
 
+    score_breakdown = ScoreBreakdown(
+        hard_constraint_points=round(hard_constraint_points, 2),
+        preference_points=round(preference_points, 2),
+        proximity_points=round(proximity_score, 2),
+        quality_points=round(quality_score, 2),
+        penalties=round(penalties, 2),
+        total_score=round(score, 2),
+    )
+
     return RankedCandidate(
         candidate=candidate,
         score=round(score, 2),
@@ -217,6 +290,8 @@ def _evaluate_single_candidate(
         proximity_score=proximity_score,
         quality_score=quality_score,
         ranking_reasons=reasons,
+        best_retrieval_position=candidate.best_retrieval_position,
+        score_breakdown=score_breakdown,
     )
 
 
@@ -254,7 +329,27 @@ def rank_candidates(
         for cand_eval in evaluation_result.evaluations
     ]
 
-    # Deterministic multi-tier sort
+    # 1. Compute evidence-enriched position baseline (pure constraint score without geo/quality)
+    evidence_ranked = sorted(
+        ranked,
+        key=lambda r: (
+            (
+                r.score_breakdown.hard_constraint_points
+                + r.score_breakdown.preference_points
+                + r.score_breakdown.penalties
+            )
+            if r.score_breakdown
+            else r.score,
+            -r.hard_failed,
+            r.hard_supported,
+            tuple(-ord(c) for c in r.candidate.name),
+        ),
+        reverse=True,
+    )
+    for e_idx, r in enumerate(evidence_ranked, 1):
+        r.evidence_enriched_position = e_idx
+
+    # 2. Deterministic multi-tier sort
     ranked.sort(
         key=lambda r: (
             r.score,
@@ -269,9 +364,15 @@ def rank_candidates(
         reverse=True,
     )
 
-    # Assign 1-indexed ranks
+    # 3. Assign 1-indexed ranks, rank movements, and explanations
     for idx, r in enumerate(ranked, 1):
         r.rank = idx
+        r.final_recommendation_position = idx
+        if r.best_retrieval_position is not None:
+            r.rank_movement = r.best_retrieval_position - idx
+        else:
+            r.rank_movement = None
+        r.movement_explanation = generate_movement_explanation(r)
 
     if top_n is not None and top_n > 0:
         return ranked[:top_n]

@@ -31,12 +31,24 @@ def format_source_badge(source_type: str) -> str:
     return source_type.upper()
 
 
+def format_rank_movement_badge(movement: Optional[int]) -> str:
+    """Format standard visual badge for rank movement."""
+    if movement is None:
+        return "● Direct"
+    if movement > 0:
+        return f"▲ +{movement}"
+    if movement < 0:
+        return f"▼ {movement}"
+    return "● Unchanged"
+
+
 def format_constraint_cell(r: ConstraintResult) -> str:
     """Format constraint status with multi-source provenance for the constraint matrix table."""
     if r.status == ConstraintStatus.UNKNOWN:
         return "?"
 
     symbol = "✓" if r.status == ConstraintStatus.SUPPORTED else "✗"
+
     if not r.supporting_evidence:
         return symbol
 
@@ -106,7 +118,7 @@ def format_candidate_summary_card(
     ranked_cand: RankedCandidate,
     index: int,
 ) -> dict[str, str]:
-    """Format structured metadata card for Top 3 candidates."""
+    """Format structured metadata card for V1 Top 3 candidates."""
     cand = ranked_cand.candidate
     letter = get_marker_label(index)
     dist_str = (
@@ -140,6 +152,48 @@ def format_candidate_summary_card(
         "types": ", ".join(cand.place_types) if cand.place_types else "N/A",
         "google_maps_url": cand.google_maps_url or "",
     }
+
+
+def format_candidate_journey_card(
+    ranked_cand: RankedCandidate,
+    index: int,
+) -> dict[str, str]:
+    """Format structured metadata card for V2 Journey Analysis with SJO fields."""
+    card = format_candidate_summary_card(ranked_cand, index)
+
+    ret_pos_str = (
+        f"#{ranked_cand.best_retrieval_position}"
+        if ranked_cand.best_retrieval_position is not None
+        else "N/A"
+    )
+    movement_str = (
+        f"{ranked_cand.rank_movement:+d}"
+        if ranked_cand.rank_movement is not None
+        else "N/A"
+    )
+    movement_badge = format_rank_movement_badge(ranked_cand.rank_movement)
+
+    sb = ranked_cand.score_breakdown
+    hard_pts = f"{sb.hard_constraint_points:.1f}" if sb else "N/A"
+    pref_pts = f"{sb.preference_points:.1f}" if sb else "N/A"
+    penalties_pts = f"{sb.penalties:.1f}" if sb else "N/A"
+    prox_pts = f"{sb.proximity_points:.1f}" if sb else f"{ranked_cand.proximity_score:.1f}"
+    qual_pts = f"{sb.quality_points:.1f}" if sb else f"{ranked_cand.quality_score:.1f}"
+
+    card.update(
+        {
+            "retrieval_position": ret_pos_str,
+            "rank_movement": movement_str,
+            "movement_badge": movement_badge,
+            "movement_explanation": ranked_cand.movement_explanation or "",
+            "hard_points": hard_pts,
+            "pref_points": pref_pts,
+            "penalties": penalties_pts,
+            "proximity_points": prox_pts,
+            "quality_points": qual_pts,
+        }
+    )
+    return card
 
 
 def format_intent_attributes(intent: SearchIntent) -> list[tuple[str, str]]:
