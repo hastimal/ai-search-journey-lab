@@ -5,7 +5,13 @@ from typing import Any, Optional
 import httpx
 
 from ai_search_journey.config import settings
-from ai_search_journey.models import Candidate, FanoutQuery, ReferenceLocation, ToolName
+from ai_search_journey.models import (
+    Candidate,
+    FanoutQuery,
+    ReferenceLocation,
+    RetrievalOccurrence,
+    ToolName,
+)
 
 PLACES_SEARCH_TEXT_URL = "https://places.googleapis.com/v1/places:searchText"
 
@@ -191,7 +197,7 @@ async def search_places(
         return []
 
     candidates: list[Candidate] = []
-    for raw in places_raw:
+    for position, raw in enumerate(places_raw, 1):
         place_id = raw.get("id")
         if not place_id:
             continue
@@ -208,6 +214,14 @@ async def search_places(
             opening_hours_raw.get("weekdayDescriptions", [])
             if isinstance(opening_hours_raw, dict)
             else []
+        )
+
+        occurrence = RetrievalOccurrence(
+            query_task_id=task.task_id,
+            query_text=task.query,
+            position=position,
+            source_name="google_places",
+            place_id=str(place_id),
         )
 
         candidates.append(
@@ -231,6 +245,7 @@ async def search_places(
                 google_maps_url=raw.get("googleMapsUri"),
                 opening_hours=list(weekday_descriptions),
                 retrieval_task_ids=[task.task_id] if task.task_id else [],
+                retrieval_occurrences=[occurrence],
             )
         )
 

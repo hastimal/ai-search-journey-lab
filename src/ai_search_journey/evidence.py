@@ -349,7 +349,58 @@ def aggregate_evidence(
                 else:
                     unmatched_evidence.append(evidence_item)
 
+    aggregated_candidates = [candidate_evidence_map[c.place_id] for c in candidates]
+    for ce in aggregated_candidates:
+        ce.evidence_coverage = calculate_evidence_coverage(ce)
+        ce.citation_coverage = calculate_citation_coverage(ce)
+
     return EvidenceAggregationResult(
-        candidates=[candidate_evidence_map[c.place_id] for c in candidates],
+        candidates=aggregated_candidates,
         unmatched_search_evidence=unmatched_evidence,
     )
+
+
+def calculate_evidence_coverage(ce: CandidateEvidence) -> float:
+    """Calculate the ratio of core evidence domains present for this candidate (0.0 to 1.0).
+
+    Core evidence domains:
+    1. Address / location details
+    2. Coordinates (lat/lng)
+    3. Rating / review quality signal
+    4. Opening hours schedule
+    5. Search grounding qualitative evidence
+    """
+    total_domains = 5
+    present = 0
+
+    has_address = any(e.attribute == "formatted_address" for e in ce.structured_evidence)
+    has_coords = any(e.attribute == "location" for e in ce.structured_evidence)
+    has_rating = any(e.attribute == "rating" for e in ce.structured_evidence)
+    has_hours = any(e.attribute == "opening_hours" for e in ce.structured_evidence)
+    has_search = len(ce.search_evidence) > 0
+
+    if has_address:
+        present += 1
+    if has_coords:
+        present += 1
+    if has_rating:
+        present += 1
+    if has_hours:
+        present += 1
+    if has_search:
+        present += 1
+
+    return round(present / total_domains, 2)
+
+
+def calculate_citation_coverage(ce: CandidateEvidence) -> float:
+    """Calculate the ratio of search claims with verifiable citations (0.0 to 1.0)."""
+    if not ce.search_evidence:
+        return 0.0
+
+    cited_count = sum(
+        1
+        for se in ce.search_evidence
+        if bool(se.source_url or se.source_title or se.source_indices)
+    )
+    return round(cited_count / len(ce.search_evidence), 2)

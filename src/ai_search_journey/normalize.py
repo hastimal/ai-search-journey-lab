@@ -119,6 +119,20 @@ def _merge_candidate(canonical: Candidate, incoming: Candidate) -> Candidate:
     if merged_task_ids != canonical.retrieval_task_ids:
         updated_fields["retrieval_task_ids"] = merged_task_ids
 
+    # Merge retrieval occurrences preserving all appearances across queries
+    merged_occurrences = list(canonical.retrieval_occurrences)
+    for occ in incoming.retrieval_occurrences:
+        already_present = any(
+            o.query_task_id == occ.query_task_id
+            and o.query_text == occ.query_text
+            and o.position == occ.position
+            for o in merged_occurrences
+        )
+        if not already_present:
+            merged_occurrences.append(occ)
+    if merged_occurrences != canonical.retrieval_occurrences:
+        updated_fields["retrieval_occurrences"] = merged_occurrences
+
     if updated_fields:
         return canonical.model_copy(update=updated_fields)
 

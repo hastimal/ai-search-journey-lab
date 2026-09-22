@@ -4,7 +4,10 @@
 
 ---
 
-> **Important Architectural Scope:**  
+> **v2.0.0 Focus — Search Journey Optimization (SJO): From Google Results to AI Recommendations**
+> How does a local business transition from its initial **Places retrieval position** to its **final AI recommendation rank**? SJO bridges retrieval provenance with deterministic constraint evaluation, evidence coverage, transparent score breakdowns, and explainable rank movement ($\Delta$).
+>
+> **Important Architectural Scope:**
 > This project uses public Google developer technologies (Gemini API via Google GenAI SDK, Google Places API (New), Google Search Grounding, Google Maps Static API, and Google Cloud Run) to demonstrate foundational AI search concepts including structured intent decomposition, query fan-out, multi-source retrieval, web grounding, deterministic constraint evaluation, explainable ranking, and grounded synthesis.
 >
 > *AI Mode* and *AI Overviews* are proprietary Google Search product experiences and are **not** APIs used by this project.
@@ -30,9 +33,9 @@ User Intent ──▶ Query Fan-Out ──▶ Multi-Source Retrieval ──▶ G
 > **"Agents reason; tools retrieve; deterministic code evaluates; evidence justifies."**
 
 - **Gemini** analyzes user questions, parses multi-label intent, generates query fan-outs, and explains the top results.
-- **Google Places API (New)** retrieves structured local entity data (names, coordinates, operating hours, ratings, types, Google Maps URLs).
+- **Google Places API (New)** retrieves structured local entity data (names, coordinates, operating hours, ratings, types, Google Maps URLs) with full retrieval provenance.
 - **Google Search Grounding** gathers real-time, qualitative web evidence, source domains, and citations.
-- **Deterministic Python** normalizes candidates, evaluates hard constraints and preferences, computes proximity, and calculates explainable ranking scores.
+- **Deterministic Python** normalizes candidates, evaluates hard constraints and preferences, computes proximity, tracks position lifecycles, and calculates explainable ranking scores.
 - **Gemini** explains and synthesizes grounded recommendations strictly for the deterministically ranked Top 3 candidates.
 
 ---
@@ -75,17 +78,23 @@ Find a coffee shop near Geekdom San Antonio for 6 people to work together, prefe
 
 - **Structured Intent Extraction:** Multi-label classification (`informational`, `navigational`, `commercial`, `transactional`, `local_discovery`) with structured extraction of reference locations, categories, operating hours, group sizes, hard constraints, and preferences.
 - **Dynamic Query Fan-Out:** LLM-driven query planner decomposing complex requests into targeted retrieval tasks routed to appropriate tools.
-- **Multi-Source Retrieval:**
-  - **Google Places API (New):** Structured candidate discovery, place details, and reference location resolution.
+- **Multi-Source Retrieval with Provenance:**
+  - **Google Places API (New):** Structured candidate discovery with 1-indexed retrieval positions, fan-out task IDs, query texts, and place IDs.
   - **Gemini + Google Search Grounding:** Dynamic grounding queries, web snippets, citations, and capture of actual executed Google Search queries.
-- **Candidate Normalization & Deduplication:** Stable entity consolidation using unique Google Place IDs with cross-query attribute merging.
+- **Candidate Normalization & Deduplication:** Stable entity consolidation using unique Google Place IDs while preserving every retrieval occurrence across fan-out queries.
 - **Evidence Aggregation & Provenance:** Unifies structured Places signals and web claims while preserving source tags (`GOOGLE PLACES`, `GOOGLE SEARCH`, `DERIVED`) and fan-out task IDs (`F1`, `F2`, `F3`, etc.).
-- **Deterministic Constraint Matrix:** 3-state evaluation semantics (`SUPPORTED`, `UNKNOWN`, `NOT_SATISFIED`), enforcing that `UNKNOWN != false`.
-- **Explainable Scoring & Proximity:** Weighted scoring with bounded proximity bonuses (Haversine formula), review saturation curves, and strict category eligibility validation.
+- **Evidence & Citation Coverage:** Per-candidate ratios measuring supported constraint evidence coverage and web grounding citation coverage.
+- **Deterministic Constraint Matrix:** Distinguishes `SUPPORTED`, `NOT_SATISFIED`, and `UNKNOWN` (`UNKNOWN != false`).
+- **Position Lifecycle & Rank Movement Tracking:**
+  - **Places Retrieval Position:** Initial 1-indexed position from Google Places retrieval.
+  - **Evidence-Enriched Position:** Intermediary rank after factoring in multi-source evidence.
+  - **Final Recommendation Position:** Final rank after comprehensive deterministic evaluation.
+  - **Rank Movement ($\Delta$):** Quantified movement (`▲ +N`, `▼ -N`, `● Unchanged`) with deterministic movement explanations.
+- **Transparent Score Breakdown:** Additive scoring model decomposing candidate scores into hard constraint points, preference points, proximity points, quality points, and penalties.
 - **Visual Mapping:** Dynamic Google Maps Static API preview with ranked markers (`A`, `B`, `C`) and direct Google Maps destination links.
 - **Grounded Answer Generation:** Structured synthesis with per-candidate summaries, evidence citations, match rationales, and explicit unknowns.
 - **Google ADK Orchestration:** Agent-driven workflow orchestration separating reasoning from deterministic evaluation.
-- **Streamlit Journey Inspector:** Transparent UI visualizing execution steps, wall-clock timing, fan-out tasks, executed search queries, evidence claims, constraint matrices, and developer traces.
+- **Streamlit Journey Inspector:** Transparent UI visualizing execution steps, wall-clock timing, rank movement badges, score breakdowns, constraint matrices, and developer traces.
 - **Production Packaging & Deployment:** Multi-stage, non-root Docker container deployment to **Google Cloud Run** backed by **Google Secret Manager** and **Artifact Registry**.
 
 ---
@@ -201,33 +210,54 @@ The Journey Inspector UI makes every stage of the AI search pipeline inspectable
 
 Constraint evaluations are strictly separated into 3 explicit states:
 
-| Status | Meaning | Scoring Impact |
-| :--- | :--- | :--- |
-| **`SUPPORTED`** | Positive evidence confirms the constraint is satisfied. | Positive bonus applied (+25 hard, +10 pref). |
-| **`UNKNOWN`** | Neither Places nor Search contained evidence confirming or denying the constraint. | **Neutral (0 pts). `UNKNOWN != false`.** |
-| **`NOT_SATISFIED`** | Retrieved evidence directly contradicts the constraint. | Strong penalty (-35 hard, -10 pref). |
+| Status | Symbol | Meaning | Scoring Impact |
+| :--- | :---: | :--- | :--- |
+| **`SUPPORTED`** | `✓` | Positive evidence confirms the constraint is satisfied. | Positive points applied (+25 hard, +10 pref). |
+| **`NOT_SATISFIED`** | `✗` | Explicit evidence or data shows the criterion was not met (e.g., closed at target hour). | Penalty applied (-35 hard, -10 pref). |
+| **`UNKNOWN`** | `?` | Neither Places nor Search contained evidence confirming or denying the constraint. | **Neutral (0 pts). `UNKNOWN != false`.** |
+
+### Coverage Metrics
+- **Evidence Coverage:** Ratio of constraints with positive evidence (`SUPPORTED`) out of total applicable constraints:
+  $$\text{Evidence Coverage} = \frac{|\text{Supported Constraints}|}{|\text{Total Constraints}|}$$
+- **Citation Coverage:** Ratio of constraints supported by verified external citations (e.g. web search grounding):
+  $$\text{Citation Coverage} = \frac{|\text{Constraints with Cited Sources}|}{|\text{Total Constraints}|}$$
 
 ### Sample Constraint Matrix
 
-| Candidate | Open After 8 PM | Group Capacity (6) | Quiet Atmosphere | Work Friendly |
-| :--- | :---: | :---: | :---: | :---: |
-| **Kafe Krave** | `✓ PLACES [F2]` | `✓ SEARCH [F3]` | `?` | `✓ SEARCH [F4]` |
-| **Local Candidate B** | `✗ PLACES [F1]` | `?` | `?` | `?` |
+| Candidate | Open After 8 PM | Group Capacity (6) | Quiet Atmosphere | Work Friendly | Evidence Cov. |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Local Coffee A** | `✓ PLACES [F2]` | `✓ SEARCH [F3]` | `?` | `✓ SEARCH [F4]` | 75% |
+| **Local Candidate B** | `✗ PLACES [F1]` | `?` | `?` | `?` | 0% |
 
 ### Provenance Tracking
 Every evidence item maintains strict source provenance:
-- **`GOOGLE PLACES`**: Derived directly from verified Google Places API attributes (e.g. `currentOpeningHours`).
+- **`GOOGLE PLACES`**: Derived directly from verified Google Places API attributes (e.g. `regularOpeningHours`).
 - **`GOOGLE SEARCH`**: Extracted from web search grounding chunks with associated source titles, domains, and URLs.
 - **`DERIVED`**: Computed by deterministic code (e.g., Haversine distance, constraint matrices, rank scores).
 
 ---
 
-## 8. Deterministic Ranking Logic
+## 8. Deterministic Ranking Logic & Position Lifecycle
 
 **LLMs do not choose the winner.** Candidate ranking is computed by deterministic Python logic using explicit scoring rules:
 
-- **Hard Constraints:** Strong positive weight (`+25.0`) when satisfied; severe penalty (`-35.0`) when failed.
-- **Preferences:** Modest bonus (`+10.0`) when satisfied; minor deduction (`-10.0`) when failed.
+### Position Lifecycle
+1. **Places Retrieval Position ($P_{\text{retrieval}}$):** The initial 1-indexed rank returned by Google Places Text Search.
+2. **Evidence-Enriched Position ($P_{\text{evidence}}$):** Position after incorporating multi-source evidence and initial constraint satisfaction.
+3. **Final Recommendation Position ($P_{\text{rec}}$):** Final rank after applying the full additive scoring formula.
+4. **Rank Movement ($\Delta$):**
+   $$\Delta = P_{\text{retrieval}} - P_{\text{rec}}$$
+   - $\Delta > 0$: Candidate moved up (`▲ +N`) due to strong constraint satisfaction or proximity.
+   - $\Delta < 0$: Candidate moved down (`▼ -N`) due to failed hard constraints or distant location.
+   - $\Delta = 0$: Candidate position unchanged (`● Unchanged`).
+
+### Transparent Score Breakdown
+Candidate scores are decomposed into distinct, inspectable components:
+
+$$\text{Total Score} = \text{Hard Points} + \text{Preference Points} + \text{Proximity Points} + \text{Quality Points} + \text{Penalties}$$
+
+- **Hard Constraints:** `+25.0` per supported constraint; `-35.0` penalty per unsatisfied constraint.
+- **Preferences:** `+10.0` per supported preference; `-10.0` deduction per unsatisfied preference.
 - **Unknown Constraints:** Neutral weight (`0.0`), preventing missing web claims from penalizing valid local businesses.
 - **Proximity Bonus:** Smoothly decaying Haversine distance bonus up to `+12.0` points:
   $$\text{Bonus} = \frac{12.0}{1.0 + \text{Distance in Miles}}$$
@@ -270,6 +300,7 @@ ai-search-journey-lab/
 │   ├── deploy_cloud_run.sh          # Automated Docker build, push, and Cloud Run deploy
 │   ├── delete_cloud_run.sh          # Safe cleanup script for Cloud Run service & images
 │   ├── run_app.py                   # Local Streamlit runner
+│   ├── demo_journey_v2.py           # v2.0.0 Search Journey Optimization (SJO) CLI demo
 │   ├── demo_intent_extraction.py    # Intent parsing CLI demo
 │   ├── demo_fanout.py               # Query fan-out CLI demo
 │   ├── demo_places.py               # Places retrieval CLI demo

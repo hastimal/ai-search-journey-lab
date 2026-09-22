@@ -6,7 +6,7 @@ from ai_search_journey.config import Settings
 
 def test_package_version() -> None:
     """Verify package version is defined."""
-    assert ai_search_journey.__version__ == "0.1.0"
+    assert ai_search_journey.__version__ == "2.0.0"
 
 
 def test_settings_defaults() -> None:

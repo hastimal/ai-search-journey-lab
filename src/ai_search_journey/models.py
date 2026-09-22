@@ -74,6 +74,16 @@ class SearchGroundingResult(BaseModel):
     citations: list[SearchCitation] = Field(default_factory=list)
 
 
+class RetrievalOccurrence(BaseModel):
+    """A single retrieval occurrence of a candidate in a Places query result set."""
+
+    query_task_id: Optional[str] = None
+    query_text: str
+    position: int = Field(ge=1)  # 1-indexed Places retrieval position
+    source_name: str = "google_places"
+    place_id: str
+
+
 class Candidate(BaseModel):
     """Normalized representation of a local candidate place."""
 
@@ -90,6 +100,23 @@ class Candidate(BaseModel):
     google_maps_url: Optional[str] = None
     opening_hours: list[str] = Field(default_factory=list)
     retrieval_task_ids: list[str] = Field(default_factory=list)
+    retrieval_occurrences: list[RetrievalOccurrence] = Field(default_factory=list)
+
+    @property
+    def best_retrieval_position(self) -> Optional[int]:
+        """Best (lowest numerical 1-indexed) Places retrieval position across all queries."""
+        if not self.retrieval_occurrences:
+            return None
+        return min(occ.position for occ in self.retrieval_occurrences)
+
+    @property
+    def retrieval_queries(self) -> list[str]:
+        """Unique fan-out query texts in which this candidate appeared."""
+        queries: list[str] = []
+        for occ in self.retrieval_occurrences:
+            if occ.query_text and occ.query_text not in queries:
+                queries.append(occ.query_text)
+        return queries
 
 
 class EvidenceSource(str, Enum):
@@ -122,6 +149,8 @@ class CandidateEvidence(BaseModel):
     candidate: Candidate
     structured_evidence: list[Evidence] = Field(default_factory=list)
     search_evidence: list[Evidence] = Field(default_factory=list)
+    evidence_coverage: float = Field(default=0.0, ge=0.0, le=1.0)
+    citation_coverage: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 class EvidenceAggregationResult(BaseModel):
@@ -245,6 +274,17 @@ class ReferenceLocation(BaseModel):
     longitude: float = Field(ge=-180.0, le=180.0)
 
 
+class ScoreBreakdown(BaseModel):
+    """Detailed score breakdown providing transparent attribution for candidate ranking."""
+
+    hard_constraint_points: float = 0.0
+    preference_points: float = 0.0
+    proximity_points: float = 0.0
+    quality_points: float = 0.0
+    penalties: float = 0.0
+    total_score: float = 0.0
+
+
 class RankedCandidate(BaseModel):
     """Candidate place augmented with scoring, proximity, and constraint match details."""
 
@@ -263,6 +303,12 @@ class RankedCandidate(BaseModel):
     quality_score: float = 0.0
     category_eligibility: Optional[CategoryEligibility] = None
     ranking_reasons: list[str] = Field(default_factory=list)
+    best_retrieval_position: Optional[int] = None
+    evidence_enriched_position: Optional[int] = None
+    final_recommendation_position: int = 1
+    rank_movement: Optional[int] = None
+    score_breakdown: Optional[ScoreBreakdown] = None
+    movement_explanation: Optional[str] = None
 
 
 class MapMarker(BaseModel):
