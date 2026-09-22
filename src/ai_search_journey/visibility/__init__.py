@@ -1,5 +1,12 @@
-"""AI Visibility (V3) domain models and enums."""
+"""AI Visibility (V3) domain models, enums, and deterministic observation extractor."""
 
+from ai_search_journey.visibility.extractor import (
+    AmbiguousBrandMatchError,
+    build_answer_mention_corpus,
+    extract_brand_mentions,
+    extract_visibility_scan_bundle,
+    match_candidate_to_brand,
+)
 from ai_search_journey.visibility.models import (
     BrandObservation,
     BrandProfile,
@@ -16,6 +23,7 @@ from ai_search_journey.visibility.models import (
 )
 
 __all__ = [
+    "AmbiguousBrandMatchError",
     "BrandObservation",
     "BrandProfile",
     "BrandRole",
@@ -27,5 +35,9 @@ __all__ = [
     "VisibilityProject",
     "VisibilityScan",
     "VisibilityScanBundle",
+    "build_answer_mention_corpus",
+    "extract_brand_mentions",
+    "extract_visibility_scan_bundle",
+    "match_candidate_to_brand",
     "normalize_domain",
 ]
