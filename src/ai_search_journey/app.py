@@ -33,6 +33,7 @@ from ai_search_journey.ui_formatters import (
     format_source_badge,
     render_execution_timeline,
 )
+from ai_search_journey.visibility.ui import render_visibility_tab
 
 DEFAULT_COFFEE_QUERY = (
     "Find a coffee shop near Geekdom San Antonio for 6 people "
@@ -133,17 +134,28 @@ def render_app() -> None:
 
     journey = st.session_state.journey_result
     if not journey:
-        render_journey_hint()
+        tab_v1, tab_v2, tab_v3 = st.tabs([
+            "Search to Decision [V1]",
+            "Journey Analysis [V2]",
+            "AI Visibility [V3]",
+        ])
+        with tab_v1:
+            render_journey_hint()
+        with tab_v2:
+            render_journey_hint()
+        with tab_v3:
+            render_visibility_tab(None)
         return
 
     # 3. Search Journey Complete Collapsible Expander (Default collapsed)
     if journey.execution_trace:
         render_execution_timeline(journey.execution_trace, journey=journey)
 
-    # Capability Tabs: V1 (Search to Decision) & V2 (Journey Analysis)
-    tab_v1, tab_v2 = st.tabs([
+    # Capability Tabs: V1 (Search to Decision), V2 (Journey Analysis), V3 (AI Visibility)
+    tab_v1, tab_v2, tab_v3 = st.tabs([
         "Search to Decision [V1]",
         "Journey Analysis [V2]",
+        "AI Visibility [V3]",
     ])
 
     # ==================================================================
@@ -513,6 +525,12 @@ def render_app() -> None:
                     st.markdown("#### 🎯 Supporting Ranking Reasons")
                     for reason in cand_ranked.ranking_reasons:
                         st.markdown(f"- {reason}")
+
+    # ==================================================================
+    # TAB 3: AI Visibility [V3] (Milestone 6)
+    # ==================================================================
+    with tab_v3:
+        render_visibility_tab(journey)
 
 
 if __name__ == "__main__":

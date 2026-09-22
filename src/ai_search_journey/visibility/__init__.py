@@ -65,6 +65,7 @@ from ai_search_journey.visibility.runner import (
     VisibilityScanResult,
     run_visibility_scan,
 )
+from ai_search_journey.visibility.ui import render_visibility_tab
 
 __all__ = [
     "ALL_TABLES",
@@ -113,6 +114,7 @@ __all__ = [
     "get_schema_seed_statements",
     "match_candidate_to_brand",
     "normalize_domain",
+    "render_visibility_tab",
     "run_visibility_scan",
     "serialize_bundle_canonically",
     "validate_dataset_id",
