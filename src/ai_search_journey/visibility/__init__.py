@@ -7,6 +7,12 @@ from ai_search_journey.visibility.extractor import (
     extract_visibility_scan_bundle,
     match_candidate_to_brand,
 )
+from ai_search_journey.visibility.metrics import (
+    VisibilityTrendPoint,
+    calculate_competitor_comparison,
+    calculate_visibility_metrics,
+    calculate_visibility_trend,
+)
 from ai_search_journey.visibility.models import (
     BrandObservation,
     BrandProfile,
@@ -21,6 +27,12 @@ from ai_search_journey.visibility.models import (
     VisibilityScanBundle,
     normalize_domain,
 )
+from ai_search_journey.visibility.repository import (
+    DuplicateScanError,
+    InMemoryVisibilityRepository,
+    InvalidRepositoryFilterError,
+    VisibilityRepository,
+)
 
 __all__ = [
     "AmbiguousBrandMatchError",
@@ -28,14 +40,22 @@ __all__ = [
     "BrandProfile",
     "BrandRole",
     "CitationObservation",
+    "DuplicateScanError",
     "FanoutObservation",
+    "InMemoryVisibilityRepository",
+    "InvalidRepositoryFilterError",
     "PromptDefinition",
     "ScanStatus",
     "VisibilityMetrics",
     "VisibilityProject",
+    "VisibilityRepository",
     "VisibilityScan",
     "VisibilityScanBundle",
+    "VisibilityTrendPoint",
     "build_answer_mention_corpus",
+    "calculate_competitor_comparison",
+    "calculate_visibility_metrics",
+    "calculate_visibility_trend",
     "extract_brand_mentions",
     "extract_visibility_scan_bundle",
     "match_candidate_to_brand",
