@@ -32,6 +32,10 @@ dev = [
 bigquery = [
     "google-cloud-bigquery>=3.20,<4",
 ]
+v4-agent = [
+    "google-adk>=2.9.0",
+    "mcp>=2.2.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
