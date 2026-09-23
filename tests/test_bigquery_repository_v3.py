@@ -108,8 +108,9 @@ def _make_test_bundle(
 # ======================================================================
 
 
-def test_lazy_dependency_behavior() -> None:
+def test_lazy_dependency_behavior(monkeypatch: pytest.MonkeyPatch) -> None:
     """14. Instantiating without client and without SDK raises BigQueryDependencyError."""
+    monkeypatch.setattr("ai_search_journey.visibility.bigquery_repository._get_bigquery_module", lambda: None)
     with pytest.raises(BigQueryDependencyError, match=r'pip install -e "\.\[bigquery\]"'):
         BigQueryVisibilityRepository(project_id="my-project")
 

@@ -319,3 +319,115 @@ def test_changed_payload_changes_hash() -> None:
     b2 = _make_test_bundle(brand_name="Beta")
 
     assert calculate_bundle_sha256(b1) != calculate_bundle_sha256(b2)
+
+
+# ======================================================================
+# Bootstrap Script Integration & Argument Validation Tests (14-17)
+# ======================================================================
+
+
+def test_bootstrap_script_help_flag() -> None:
+    """14. Verify scripts/bootstrap_bigquery_v3.sh displays usage on --help."""
+    import subprocess
+
+    result = subprocess.run(
+        ["./scripts/bootstrap_bigquery_v3.sh", "--help"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert "Usage: ./scripts/bootstrap_bigquery_v3.sh" in result.stdout
+    assert "--project PROJECT_ID" in result.stdout
+    assert "--dataset DATASET_ID" in result.stdout
+    assert "--location LOCATION" in result.stdout
+    assert "--apply" in result.stdout
+
+
+def test_bootstrap_script_derives_project_or_accepts_override() -> None:
+    """15. Verify bootstrap_bigquery_v3.sh prints resolved project and accepts overrides."""
+    import subprocess
+
+    # With explicit project override
+    r1 = subprocess.run(
+        [
+            "./scripts/bootstrap_bigquery_v3.sh",
+            "--project",
+            "override-proj-123",
+            "--dataset",
+            "custom_ds",
+            "--location",
+            "EU",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert r1.returncode == 0
+    assert "Resolved Project:  override-proj-123 (explicit argument (--project))" in r1.stdout
+    assert "Dataset ID:        custom_ds" in r1.stdout
+    assert "Dataset Location:  EU" in r1.stdout
+
+    # With default arguments (auto-derives from active gcloud config or env)
+    r2 = subprocess.run(
+        ["./scripts/bootstrap_bigquery_v3.sh"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert r2.returncode == 0
+    assert "Resolved Project:" in r2.stdout
+    assert "Dataset ID:        ai_search_journey_v3" in r2.stdout
+    assert "Dataset Location:  US" in r2.stdout
+    assert "DRY RUN (Preview Only)" in r2.stdout
+
+
+def test_bootstrap_script_rejects_empty_flag_values() -> None:
+    """16. Verify scripts/bootstrap_bigquery_v3.sh rejects flags without explicit values."""
+    import subprocess
+
+    r = subprocess.run(
+        [
+            "./scripts/bootstrap_bigquery_v3.sh",
+            "--project",
+            "--dataset",
+            "test_ds",
+            "--location",
+            "US",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert r.returncode != 0
+    assert "--project requires a non-empty PROJECT_ID" in r.stderr
+
+
+def test_bootstrap_script_dry_run_execution() -> None:
+    """17. Verify bootstrap_bigquery_v3.sh performs a safe dry run when --apply is omitted."""
+    import subprocess
+
+    result = subprocess.run(
+        [
+            "./scripts/bootstrap_bigquery_v3.sh",
+            "--project",
+            "my-dryrun-proj",
+            "--dataset",
+            "my_v3_ds",
+            "--location",
+            "US",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert "[DRY RUN] Planned Actions:" in result.stdout
+    assert "my-dryrun-proj.my_v3_ds.visibility_scans" in result.stdout
+    assert "my-dryrun-proj.my_v3_ds.brand_observations" in result.stdout
+    assert "my-dryrun-proj.my_v3_ds.fanout_observations" in result.stdout
+    assert "my-dryrun-proj.my_v3_ds.citations" in result.stdout
+    assert "my-dryrun-proj.my_v3_ds.bundle_payloads" in result.stdout
+    assert "my-dryrun-proj.my_v3_ds.repository_locks" in result.stdout
+    assert "--apply was not provided" in result.stdout
+    assert "To execute these changes against BigQuery, re-run with --apply" in result.stdout

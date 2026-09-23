@@ -4,13 +4,14 @@
 
 ---
 
-> **v2.0.0 Focus — Search Journey Optimization (SJO): From Google Results to AI Recommendations**
-> How does a local business transition from its initial **Places retrieval position** to its **final AI recommendation rank**? SJO bridges retrieval provenance with deterministic constraint evaluation, evidence coverage, transparent score breakdowns, and explainable rank movement ($\Delta$).
+> **v3.0.0 Focus — AI Visibility & Search Journey Optimization (SJO)**
+> How does a local business transition from its initial **Places retrieval position** to its **final AI recommendation rank**? SJO bridges retrieval provenance with deterministic constraint evaluation, evidence coverage, transparent score breakdowns, explainable rank movement ($\Delta$), and **V3 AI Visibility analytics** (Share of Voice, brand presence, narrative mention rate, and owned citation authority).
 >
 > **Important Architectural Scope:**
-> This project uses public Google developer technologies (Gemini API via Google GenAI SDK, Google Places API (New), Google Search Grounding, Google Maps Static API, and Google Cloud Run) to demonstrate foundational AI search concepts including structured intent decomposition, query fan-out, multi-source retrieval, web grounding, deterministic constraint evaluation, explainable ranking, and grounded synthesis.
->
-> *AI Mode* and *AI Overviews* are proprietary Google Search product experiences and are **not** APIs used by this project.
+> - **Local / Public Demos:** Run strictly in-memory (`Session only`) with zero database dependencies.
+> - **Optional BigQuery History:** Historical analysis and cross-run trends can be activated by configuring Google Cloud BigQuery.
+> - **Educational Reference Implementation:** Uses public Google developer technologies (Gemini API via Google GenAI SDK, Google Places API (New), Google Search Grounding, Google Maps Static API, and Google Cloud Run) to demonstrate observable, multi-step search-agent design patterns.
+> - **Disclaimer:** This project does **not** recreate proprietary Google Search backend systems, Google AI Overviews, or Google AI Mode.
 
 ---
 
@@ -42,35 +43,32 @@ User Intent ──▶ Query Fan-Out ──▶ Multi-Source Retrieval ──▶ G
 
 ## 2. Demo
 
-The Journey Inspector makes the complete AI search journey visible instead of showing only a final recommendation.
+The Journey Inspector makes the complete AI search journey visible across three dedicated operational stages: **Search to Decision [V1]**, **Journey Analysis [V2]**, and **AI Visibility [V3]**.
 
-It exposes:
-- parsed search intent
-- dynamic planner query fan-out
-- Google Places retrieval
-- executed Google Search grounding queries
-- evidence provenance
-- deterministic constraint evaluation
-- ranking and proximity
-- Top 3 recommendations
-- Google Maps Static API preview
-- grounded final answer
-- ADK developer trace
-- per-step execution timing
+> **Important Scope & Architecture Note:**
+> - **Local & Public Demos use Session Only (In-Memory):** In-memory storage is the default mode for local development, Streamlit exploration, and public demos without cloud database setup.
+> - **Optional BigQuery History:** Persistent historical analysis, cross-run analytics, and multi-journey brand tracking can be enabled separately by configuring Google Cloud BigQuery.
+> - **Educational Reference Implementation:** This open-source lab teaches observable, multi-step search-agent design patterns (retrieval provenance, deterministic constraint evaluation, explainable ranking, and visibility analytics). It **does not** recreate proprietary Google Search backend systems, Google AI Overviews, or Google AI Mode.
 
-![AI Search Journey Lab Demo](assets/ai-search-journey-lab.png)
+### Stage 1: Search to Decision [V1]
+*End-to-end user journey showing intent extraction, query fan-out, multi-source retrieval, constraint verification, static map preview, and grounded recommendations.*
 
-> **Example:** Finding a coffee shop near Geekdom San Antonio for six people to work together, preferably quiet, and open after 8 PM. The UI keeps unsupported or unavailable evidence explicitly marked as unverified (`?` unknown) rather than converting unknowns into false claims.
->
-> **Execution Summary:** `✅ Search Journey Complete · 53.0s`
->
-> In this example, the complete journey finished in approximately 53 seconds. The execution panel is collapsible, making it easy to switch between the final recommendations (high-level result view) and the underlying intent extraction, fan-out, retrieval, grounding, evidence aggregation, constraint evaluation, and ranking steps (detailed execution trace). Runtime varies between executions because external retrieval and Google Search grounding calls are live.
+![Search to Decision V1](assets/screenshots/v1-search-to-decision.png)
 
-### Example Query
+### Stage 2: Journey Analysis [V2]
+*Deep-dive analysis tracking candidate retrieval provenance, transparent score breakdowns (hard points, preferences, proximity, quality), and deterministic rank movement ($\Delta$).*
 
-```text
-Find a coffee shop near Geekdom San Antonio for 6 people to work together, preferably quiet, and open after 8 PM.
-```
+![Journey Analysis V2](assets/screenshots/v2-journey-analysis.png)
+
+### Stage 3: AI Visibility [V3] — Configuration
+*Target brand configuration with optional domain/alias matching, candidate competitor selection, and custom competitor additions.*
+
+![AI Visibility V3 Configuration](assets/screenshots/v3-visibility-configuration.png)
+
+### Stage 3: AI Visibility [V3] — Results & Share of Voice
+*Multi-metric visibility dashboard reporting Brand Presence, Narrative Mention Rate, Recommendation Rate, Owned Citation Rate, and Share of Voice (SOV) against competitors.*
+
+![AI Visibility V3 Results](assets/screenshots/v3-visibility-results.png)
 
 ---
 
@@ -93,8 +91,9 @@ Find a coffee shop near Geekdom San Antonio for 6 people to work together, prefe
 - **Transparent Score Breakdown:** Additive scoring model decomposing candidate scores into hard constraint points, preference points, proximity points, quality points, and penalties.
 - **Visual Mapping:** Dynamic Google Maps Static API preview with ranked markers (`A`, `B`, `C`) and direct Google Maps destination links.
 - **Grounded Answer Generation:** Structured synthesis with per-candidate summaries, evidence citations, match rationales, and explicit unknowns.
+- **AI Visibility Analytics [V3]:** Target brand and competitor benchmarking measuring presence in retrieval, narrative mentions, top-3 recommendations, citation authority, and competitive SOV.
 - **Google ADK Orchestration:** Agent-driven workflow orchestration separating reasoning from deterministic evaluation.
-- **Streamlit Journey Inspector:** Transparent UI visualizing execution steps, wall-clock timing, rank movement badges, score breakdowns, constraint matrices, and developer traces.
+- **Streamlit Journey Inspector:** Transparent UI visualizing execution steps, wall-clock timing, rank movement badges, score breakdowns, constraint matrices, visibility dashboards, and developer traces.
 - **Production Packaging & Deployment:** Multi-stage, non-root Docker container deployment to **Google Cloud Run** backed by **Google Secret Manager** and **Artifact Registry**.
 
 ---
@@ -123,61 +122,62 @@ The pipeline operates on arbitrary local discovery questions without hardcoded l
 ## 5. Architecture
 
 ```text
-                          User Question
-                                │
-                                ▼
-                       Gemini / Google ADK
-                                │
-                                ▼
-                         Structured Intent
-                                │
-                                ▼
-                      Dynamic Query Fan-Out
-                                │
-            ┌───────────────────┴───────────────────┐
-            ▼                                       ▼
-   Google Places API                        Gemini +
-         (New)                       Google Search Grounding
-            │                                       │
-   Structured Local Data               Qualitative Web Evidence
-   - Operating hours                   - Grounded text
-   - Coordinates (lat/lon)             - Executed search queries
-   - Ratings & review counts           - Source domains & URLs
-   - Category / Primary type           - Text grounding citations
-   - Google Maps URLs                               │
-            │                                       │
-            └───────────────────┬───────────────────┘
-                                │
-                                ▼
-                    Candidate Normalization
-                    (Deduplicate on Place ID)
-                                │
-                                ▼
-                       Evidence Aggregation
-                     (Multi-Source Provenance)
-                                │
-                                ▼
-                   Deterministic Constraints
-                (SUPPORTED / UNKNOWN / NOT_SATISFIED)
-                                │
-                                ▼
-                      Deterministic Ranking
-                   (Hard/Pref Weights + Proximity)
-                                │
-                                ▼
-                              Top 3
-                    ┌───────────┴───────────┐
-                    ▼                       ▼
-            Google Maps URLs         Maps Static API
-                                     (A / B / C Markers)
-                    └───────────┬───────────┘
-                                │
-                                ▼
-                             Gemini
-                     (Grounded Explanation)
-                                │
-                                ▼
-                   Streamlit Journey Inspector
+                                              User Question
+                                                    │
+                                                    ▼
+                                           Gemini / Google ADK
+                                                    │
+                                                    ▼
+                                          Dynamic Query Fan-Out
+                                                    │
+                                ┌───────────────────┴───────────────────┐
+                                ▼                                       ▼
+                       Google Places API                        Gemini +
+                             (New)                       Google Search Grounding
+                                │                                       │
+                       Structured Local Data               Qualitative Web Evidence
+                       - Operating hours                   - Grounded text
+                       - Coordinates (lat/lon)             - Executed search queries
+                       - Ratings & review counts           - Source domains & URLs
+                       - Category / Primary type           - Text grounding citations
+                       - Google Maps URLs                               │
+                                │                                       │
+                                └───────────────────┬───────────────────┘
+                                                    │
+                                                    ▼
+                                        Candidate Normalization
+                                        (Deduplicate on Place ID)
+                                                    │
+                                                    ▼
+                                           Evidence Aggregation
+                                         (Multi-Source Provenance)
+                                                    │
+                                                    ▼
+                                        Deterministic Constraints
+                                   (SUPPORTED / UNKNOWN / NOT_SATISFIED)
+                                                    │
+                                                    ▼
+                                          Deterministic Ranking
+                                      (Hard/Pref Weights + Proximity)
+                                                    │
+                    ┌───────────────────────────────┴───────────────────────────────┐
+                    ▼                               ▼                               ▼
+       ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────────┐
+       │   V1: Recommendations   │     │   V2: Ranking Analysis  │     │  V3: Visibility Analysis│
+       ├─────────────────────────┤     ├─────────────────────────┤     ├─────────────────────────┤
+       │ • Top 3 Grounded Picks  │     │ • Multi-query provenance│     │ • Target brand metrics  │
+       │ • Static Map & Markers  │     │ • Score decomposition   │     │ • Competitor SOV        │
+       │ • Constraint matrix     │     │ • Rank movement (Δ)     │     │ • Owned citation audit  │
+       │ • Grounded answer prose │     │ • Positional lifecycle  │     │ • Mention & rec. rates  │
+       └─────────────────────────┘     └─────────────────────────┘     └────────────┬────────────┘
+                                                                                    │
+                                                                   ┌────────────────┴────────────────┐
+                                                                   ▼                                 ▼
+                                                       ┌───────────────────────┐         ┌───────────────────────┐
+                                                       │  Session (In-Memory)  │         │   Optional BigQuery   │
+                                                       │  • Default / Local    │         │   • Long-term History │
+                                                       │  • Zero Setup         │         │   • Cross-run Trends  │
+                                                       └───────────────────────┘         └───────────────────────┘
 ```
 
 ---
@@ -470,7 +470,21 @@ Builds the `linux/amd64` container image using Docker Buildx, pushes to Artifact
 ./scripts/deploy_cloud_run.sh
 ```
 
-### 3. Safe Cleanup
+### 3. BigQuery Bootstrap (V3 AI Visibility)
+To initialize or preview BigQuery schema tables and control locks for persistent AI Visibility tracking (auto-derives project from active `gcloud` config, with optional `--project` override):
+
+```bash
+# Dry run (previews planned actions and DDL without executing changes):
+./scripts/bootstrap_bigquery_v3.sh
+
+# Or with explicit project / dataset overrides:
+./scripts/bootstrap_bigquery_v3.sh --project YOUR_PROJECT_ID --dataset ai_search_journey_v3 --location US
+
+# Apply schema setup and verify tables:
+./scripts/bootstrap_bigquery_v3.sh --apply
+```
+
+### 4. Safe Cleanup
 Removes the Cloud Run service and Artifact Registry container images while preserving secrets, the repository, and the service account:
 
 ```bash
@@ -539,6 +553,18 @@ Contributions, feedback, and experiment ideas are welcome!
 
 ---
 
-## 20. License
+## 20. Appendix: Full Journey Analysis Trace
+
+<details>
+<summary><strong>🔍 Click to expand full-page Journey Analysis [V2] deep-dive trace</strong></summary>
+<br>
+
+![Journey Analysis Full Deep-Dive](assets/screenshots/v2-journey-analysis-full.png)
+
+</details>
+
+---
+
+## 21. License
 
 This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
