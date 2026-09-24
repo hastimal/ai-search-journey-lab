@@ -30,7 +30,7 @@ def create_v4_agent() -> Agent:
         env=os.environ.copy()
     )
     mcp_params = StdioConnectionParams(server_params=server_params)
-    
+
     mcp_toolset = McpToolset(connection_params=mcp_params)
 
     return Agent(
@@ -42,7 +42,7 @@ def create_v4_agent() -> Agent:
 
 class VisibilityAnalyticsAgent:
     """Wrapper class to maintain the expected interface while delegating to ADK."""
-    
+
     def __init__(self, **kwargs: Any) -> None:
         self.agent = create_v4_agent()
 
@@ -57,19 +57,34 @@ class VisibilityAnalyticsAgent:
         import google.genai.types as types
         from google.adk.runners import Runner
         from google.adk.sessions import InMemorySessionService
-        
+
+        # If settings.gemini_api_key is configured but GEMINI_API_KEY is absent, safely set it
+        from ai_search_journey.config import settings
+        if settings.gemini_api_key and "GEMINI_API_KEY" not in os.environ:
+            os.environ["GEMINI_API_KEY"] = settings.gemini_api_key
+
+        session_service = InMemorySessionService()
         runner = Runner(
             agent=self.agent,
-            session_service=InMemorySessionService(),
+            session_service=session_service,
             app_name="test_app"
         )
-        
+
+        import uuid
+        session_id = str(uuid.uuid4())
+        # create the unique session before running
+        session_service.create_session_sync(
+            session_id=session_id,
+            user_id="user1",
+            app_name="test_app",
+        )
+
         events = runner.run(
-            user_id="user1", 
-            session_id="session1", 
+            user_id="user1",
+            session_id=session_id,
             new_message=types.Content(role="user", parts=[types.Part.from_text(text=query)])
         )
-        
+
         # In this simplistic wrapper for the demo, we just return the final text event.
         texts = []
         for event in events:

@@ -23,7 +23,7 @@ def test_canonical_bigquery_settings_accepted(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr("ai_search_journey.config.settings.bigquery_project", "valid-project")
     monkeypatch.setattr("ai_search_journey.config.settings.bigquery_dataset", "valid-dataset")
     monkeypatch.setattr("ai_search_journey.config.settings.bigquery_location", "US")
-    
+
     is_ready, msg = check_readiness()
     assert is_ready
     assert msg == ""
@@ -34,7 +34,7 @@ def test_missing_bigquery_settings_disables_chat(monkeypatch: pytest.MonkeyPatch
         "ai_search_journey.visibility.ui_v4._get_bigquery_module", lambda: mock.MagicMock()
     )
     monkeypatch.setattr("ai_search_journey.config.settings.gemini_api_key", "valid-key")
-    
+
     # Missing project
     monkeypatch.setattr("ai_search_journey.config.settings.bigquery_project", "")
     is_ready, msg = check_readiness()
@@ -64,7 +64,7 @@ def test_missing_gemini_config_disables_chat(monkeypatch: pytest.MonkeyPatch) ->
     )
     monkeypatch.setattr("ai_search_journey.config.settings.gemini_api_key", "")
     monkeypatch.setenv("GEMINI_API_KEY", "")
-    
+
     is_ready, msg = check_readiness()
     assert not is_ready
     assert "GEMINI_API_KEY" in msg
@@ -72,7 +72,7 @@ def test_missing_gemini_config_disables_chat(monkeypatch: pytest.MonkeyPatch) ->
 def test_missing_bigquery_dependency_disables_chat(monkeypatch: pytest.MonkeyPatch) -> None:
     """BigQuery dependency missing disables chat;"""
     monkeypatch.setattr("ai_search_journey.visibility.ui_v4._get_bigquery_module", lambda: None)
-    
+
     is_ready, msg = check_readiness()
     assert not is_ready
     assert "google-cloud-bigquery" in msg
@@ -82,28 +82,30 @@ def test_chat_submission_calls_only_fake_v4_agent(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(
         "ai_search_journey.visibility.ui_v4.check_readiness", lambda: (True, "")
     )
-    
+
     fake_agent_instance = mock.MagicMock()
     fake_agent_instance.run.return_value = "Fake analysis result"
     fake_agent_class = mock.MagicMock(return_value=fake_agent_instance)
-    
+
     monkeypatch.setitem(
-        __import__('sys').modules, 
-        'ai_search_journey.visibility.v4_agent', 
+        __import__('sys').modules,
+        'ai_search_journey.visibility.v4_agent',
         mock.MagicMock(VisibilityAnalyticsAgent=fake_agent_class)
     )
 
     with mock.patch("streamlit.chat_input", return_value="What is our trend?"), \
-         mock.patch("streamlit.columns") as mock_cols_func:
-        
+         mock.patch("streamlit.columns") as mock_cols_func, \
+         mock.patch("streamlit.status") as mock_status:
+
+        mock_status.return_value.__enter__.return_value = mock.MagicMock()
         mock_col = mock.MagicMock()
         mock_col.button.return_value = False
         mock_cols_func.return_value = [mock_col] * 4
 
         render_visibility_agent_tab()
-        
+
         fake_agent_instance.run.assert_called_once_with("What is our trend?")
-        
+
         assert len(st.session_state["v4_chat_history"]) == 2
         assert st.session_state["v4_chat_history"][0]["role"] == "user"
         assert st.session_state["v4_chat_history"][0]["content"] == "What is our trend?"
@@ -116,21 +118,23 @@ def test_empty_history_result_is_rendered_honestly(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(
         "ai_search_journey.visibility.ui_v4.check_readiness", lambda: (True, "")
     )
-    
+
     fake_agent_instance = mock.MagicMock()
     fake_agent_instance.run.return_value = "The history is empty."
     fake_agent_class = mock.MagicMock(return_value=fake_agent_instance)
-    
+
     monkeypatch.setitem(
-        __import__('sys').modules, 
-        'ai_search_journey.visibility.v4_agent', 
+        __import__('sys').modules,
+        'ai_search_journey.visibility.v4_agent',
         mock.MagicMock(VisibilityAnalyticsAgent=fake_agent_class)
     )
 
     with mock.patch("streamlit.chat_input", return_value="Compare brands"):
         mock_col = mock.MagicMock()
         mock_col.button.return_value = False
-        with mock.patch("streamlit.columns", return_value=[mock_col] * 4):
+        with mock.patch("streamlit.columns", return_value=[mock_col] * 4), \
+             mock.patch("streamlit.status") as mock_status:
+            mock_status.return_value.__enter__.return_value = mock.MagicMock()
             render_visibility_agent_tab()
 
             assert len(st.session_state["v4_chat_history"]) == 2
@@ -141,30 +145,32 @@ def test_agent_error_is_shown_safely(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "ai_search_journey.visibility.ui_v4.check_readiness", lambda: (True, "")
     )
-    
+
     fake_agent_instance = mock.MagicMock()
     fake_agent_instance.run.side_effect = RuntimeError("BigQuery connection timeout")
     fake_agent_class = mock.MagicMock(return_value=fake_agent_instance)
-    
+
     monkeypatch.setitem(
-        __import__('sys').modules, 
-        'ai_search_journey.visibility.v4_agent', 
+        __import__('sys').modules,
+        'ai_search_journey.visibility.v4_agent',
         mock.MagicMock(VisibilityAnalyticsAgent=fake_agent_class)
     )
 
     with mock.patch("streamlit.chat_input", return_value="Fail please"), \
          mock.patch("streamlit.error") as mock_st_error:
-         
+
         mock_col = mock.MagicMock()
         mock_col.button.return_value = False
-        with mock.patch("streamlit.columns", return_value=[mock_col] * 4):
+        with mock.patch("streamlit.columns", return_value=[mock_col] * 4), \
+             mock.patch("streamlit.status") as mock_status:
+            mock_status.return_value.__enter__.return_value = mock.MagicMock()
             render_visibility_agent_tab()
 
             mock_st_error.assert_called_with(
                 "The agent encountered an error while processing the request."
             )
             assert (
-                st.session_state["v4_chat_history"][-1]["content"] 
+                st.session_state["v4_chat_history"][-1]["content"]
                 == "⚠️ Error processing request."
             )
             assert st.session_state["v4_chat_history"][-1].get("sources_used") is False
@@ -174,17 +180,17 @@ def test_no_legacy_execution_functions_invoked(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(
         "ai_search_journey.visibility.ui_v4.check_readiness", lambda: (True, "")
     )
-    
+
     fake_agent_instance = mock.MagicMock()
     fake_agent_instance.run.return_value = "Result"
     fake_agent_class = mock.MagicMock(return_value=fake_agent_instance)
-    
+
     monkeypatch.setitem(
-        __import__('sys').modules, 
-        'ai_search_journey.visibility.v4_agent', 
+        __import__('sys').modules,
+        'ai_search_journey.visibility.v4_agent',
         mock.MagicMock(VisibilityAnalyticsAgent=fake_agent_class)
     )
-    
+
     mock_fail = mock.MagicMock(side_effect=AssertionError("Should not be called"))
     monkeypatch.setattr(
         "ai_search_journey.visibility.runner.run_visibility_scan", mock_fail, raising=False
@@ -196,5 +202,7 @@ def test_no_legacy_execution_functions_invoked(monkeypatch: pytest.MonkeyPatch) 
     with mock.patch("streamlit.chat_input", return_value="Test no legacy execution"):
         mock_col = mock.MagicMock()
         mock_col.button.return_value = False
-        with mock.patch("streamlit.columns", return_value=[mock_col] * 4):
+        with mock.patch("streamlit.columns", return_value=[mock_col] * 4), \
+             mock.patch("streamlit.status") as mock_status:
+            mock_status.return_value.__enter__.return_value = mock.MagicMock()
             render_visibility_agent_tab()
