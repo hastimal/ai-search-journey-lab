@@ -285,19 +285,19 @@ $$\text{Total Score} = \text{Hard Points} + \text{Preference Points} + \text{Pro
 
 | Technology | Role in Architecture |
 | :--- | :--- |
-| **Gemini API (`gemini-2.5-flash`)** | Natural language intent extraction, query fan-out planning, and grounded answer synthesis. |
+| **Gemini API (`gemini-3.6-flash` / `gemini-3.5-flash-lite`)** | Natural language intent extraction, query fan-out planning, and grounded answer synthesis with resilient fallback. |
 | **Google GenAI Python SDK (`google-genai`)** | Official Python interface for structured output schemas and search grounding. |
 | **Google ADK (`google-adk`)** | Agentic orchestration framework structuring reasoning, tools, and execution steps. |
 | **Google Search Grounding** | Web search tool grounding LLM reasoning with real-time web citations and sources. |
 | **Google Places API (New)** | Structured local search, entity details, operating hours, and reference location resolution. |
 | **Google Maps Static API** | Rendered map imagery displaying labeled markers (`A`, `B`, `C`) for top-ranked venues. |
-| **Streamlit** | Interactive Journey Inspector UI for step-by-step pipeline inspection. |
+| **Streamlit** | Interactive Journey Inspector UI for step-by-step pipeline inspection across four capability tabs. |
 | **Pydantic / Pydantic Settings** | Strict schema validation, data modeling, and environment configuration. |
 | **Docker** | Multi-stage, non-root container packaging (`python:3.12-slim`). |
 | **Google Artifact Registry** | Secure container image repository in GCP. |
 | **Google Cloud Run** | Fully managed serverless container runtime. |
 | **Google Secret Manager** | Secure, decoupled runtime storage for Gemini and Google Maps API keys. |
-| **pytest / Ruff / mypy** | Unit testing (140+ tests), linting, and strict static type checking. |
+| **pytest / Ruff / mypy** | Unit testing (340+ tests), linting, and strict static type checking. |
 
 ---
 
@@ -312,6 +312,7 @@ ai-search-journey-lab/
 │   └── google-for-startup.webp
 ├── scripts/                         # Automation and demo CLI scripts
 │   ├── bootstrap_gcp.sh             # One-time GCP infrastructure provisioning
+│   ├── bootstrap_bigquery_v3.sh     # BigQuery dataset & table setup for V3/V4
 │   ├── deploy_cloud_run.sh          # Automated Docker build, push, and Cloud Run deploy
 │   ├── delete_cloud_run.sh          # Safe cleanup script for Cloud Run service & images
 │   ├── run_app.py                   # Local Streamlit runner
@@ -325,6 +326,8 @@ ai-search-journey-lab/
 │   ├── demo_ranking.py              # Deterministic ranking CLI demo
 │   ├── demo_static_map.py           # Maps preview CLI demo
 │   ├── demo_answer.py               # Grounded answer synthesis CLI demo
+│   ├── demo_visibility_v3.py        # V3 AI Visibility scan CLI demo
+│   ├── demo_visibility_agent_v4.py  # V4 AI Visibility Agent CLI demo
 │   └── demo_adk.py                  # End-to-end ADK agent CLI demo
 ├── src/ai_search_journey/           # Core library package
 │   ├── __init__.py                  # Package exports
@@ -339,15 +342,24 @@ ai-search-journey-lab/
 │   ├── constraints.py               # Deterministic constraint evaluation engine
 │   ├── ranking.py                   # Scoring and explainable ranking engine
 │   ├── static_map.py                # Google Maps Static API URL generator
-│   ├── answer.py                    # Grounded answer synthesis
-│   ├── app.py                       # Streamlit Journey Inspector application
+│   ├── answer.py                    # Grounded answer synthesis with resilience
+│   ├── app.py                       # Streamlit Journey Inspector application (4 tabs)
 │   ├── ui_assets.py                 # UI branding and logo helpers
 │   ├── ui_formatters.py             # UI table, badge, and timeline formatters
-│   └── adk/                         # Google ADK agent implementation
-│       ├── __init__.py
-│       ├── agent.py                 # SearchJourneyAgent root orchestrator
-│       └── tools.py                 # ADK tool wrappers
-├── tests/                           # Comprehensive test suite (140+ tests)
+│   ├── adk/                         # Google ADK agent implementation
+│   │   ├── __init__.py
+│   │   ├── agent.py                 # SearchJourneyAgent root orchestrator
+│   │   └── tools.py                 # ADK tool wrappers
+│   └── visibility/                  # V3/V4 AI Visibility engine & Agent
+│       ├── models.py                # Visibility schemas & brand metrics
+│       ├── extractor.py             # Signal extractor & Gemini grounding
+│       ├── metrics.py               # Share of Voice & visibility calculator
+│       ├── repository.py            # BigQuery persistence & schema manager
+│       ├── mcp_server.py            # Read-only MCP analytical tools
+│       ├── agent.py                 # V4 ADK conversational agent
+│       ├── ui.py                    # V3 AI Visibility Streamlit tab
+│       └── ui_v4.py                 # V4 AI Visibility Agent Streamlit tab
+├── tests/                           # Comprehensive test suite (340+ tests)
 ├── Dockerfile                       # Production multi-stage Dockerfile
 ├── .dockerignore                    # Build context exclusions
 ├── pyproject.toml                   # Project dependencies and tool configurations
@@ -367,7 +379,7 @@ ai-search-journey-lab/
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/hastimal/ai-search-journey-lab.git
+git clone https://github.com/hastimal.jangid/ai-search-journey-lab.git
 cd ai-search-journey-lab
 
 # 2. Create and activate virtual environment
@@ -375,7 +387,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 # 3. Install package and development dependencies
-pip install -e ".[dev]"
+pip install -e ".[bigquery,v4-agent,dev]"
 
 # 4. Configure environment variables
 cp .env.example .env
@@ -384,7 +396,8 @@ cp .env.example .env
 Edit `.env`:
 ```env
 GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
-GEMINI_MODEL="gemini-2.5-flash"
+GEMINI_MODEL="gemini-3.6-flash"
+GEMINI_FALLBACK_MODEL="gemini-3.5-flash-lite"
 GOOGLE_MAPS_API_KEY="YOUR_GOOGLE_MAPS_API_KEY"
 LOG_LEVEL="INFO"
 ```
