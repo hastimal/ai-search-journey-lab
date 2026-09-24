@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Sequence
@@ -403,34 +404,38 @@ ELSE
   COMMIT TRANSACTION;
 END IF;"""
 
-        max_attempts = 3
-        base_delay = 0.5
+        # Updated retry logic with bounded exponential backoff and jitter
+        max_attempts = 4  # total attempts including the initial try
+        base_delay = 0.7  # seconds
+        jitter_factor = 0.3  # up to 30% jitter
 
         for attempt in range(max_attempts):
             try:
                 self._execute_query(tx_sql, params)
                 return
             except DuplicateScanError:
+                # Duplicate scans are not retryable
                 raise
             except Exception as exc:
-                msg = str(exc)
-                if "DUPLICATE_SCAN_ERROR" in msg:
+                msg = str(exc).lower()
+                # Duplicate scan detection
+                if "duplicate_scan_error" in msg or "duplicate scan" in msg:
                     raise DuplicateScanError(
-                        f"Conflicting scan bundle already exists for scan_id '{scan_id}'"
+                        f"Conflicting scan bundle already exists for scan_id: {scan_id}"
                     ) from exc
-
-                if (
-                    "Transaction is aborted due to concurrent update against table" in msg
-                    and "repository_locks" in msg
-                ):
+                # Concurrency retry detection
+                if "repository_locks" in msg and "concurrent update" in msg:
                     if attempt < max_attempts - 1:
-                        time.sleep(base_delay * (2 ** attempt))
+                        delay = base_delay * (2 ** attempt)
+                        jitter = random.uniform(0, jitter_factor * delay)
+                        time.sleep(delay + jitter)
                         continue
+                    # Exhausted retries – raise user‑friendly error
                     raise BigQueryWriteError(
-                        f"Failed to save bundle '{scan_id}' after {max_attempts} attempts: "
-                        "write conflicted and can be retried."
+                        "Another visibility write is still in progress. "
+                        "Please try again in a moment."
                     ) from exc
-
+                # Any other error is non‑retryable
                 raise BigQueryWriteError(
                     f"Failed to save bundle '{scan_id}' to BigQuery: {exc}"
                 ) from exc

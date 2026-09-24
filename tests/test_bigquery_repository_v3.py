@@ -260,6 +260,7 @@ def test_concurrency_retry_preserves_idempotency(monkeypatch: pytest.MonkeyPatch
 
     client.query_handler = _handler
     monkeypatch.setattr("time.sleep", lambda x: None)
+    monkeypatch.setattr("random.uniform", lambda a, b: 0.0)
 
     repo.save_bundle(bundle)
 
@@ -308,11 +309,12 @@ def test_retry_exhaustion_returns_safe_expected_error(monkeypatch: pytest.Monkey
 
     client.query_handler = _handler
     monkeypatch.setattr("time.sleep", lambda x: None)
+    monkeypatch.setattr("random.uniform", lambda a, b: 0.0)
 
-    with pytest.raises(BigQueryWriteError, match="write conflicted and can be retried"):
+    with pytest.raises(BigQueryWriteError, match="Another visibility write is still in progress"):
         repo.save_bundle(bundle)
 
-    assert attempts == 3
+    assert attempts == 4
 
 
 def test_missing_lock_row_fails_with_setup_instructions() -> None:
