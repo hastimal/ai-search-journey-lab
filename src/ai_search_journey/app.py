@@ -213,6 +213,12 @@ def render_app() -> None:
                         st.write("**Caveats & Disclaimers:**")
                         for c in journey.answer.caveats:
                             st.caption(f"⚠️ {c}")
+                else:
+                    st.warning(
+                        "⚠️ Final grounded answer is currently unavailable. "
+                        "Deterministic candidate rankings, constraint evaluation, "
+                        "and map preview remain fully available."
+                    )
 
             # RIGHT COLUMN: Top 3 Cards & Parsed Intent
             with col_right:
