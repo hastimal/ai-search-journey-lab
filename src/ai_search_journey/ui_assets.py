@@ -215,6 +215,200 @@ def render_app_title(
             background: none !important;
             -webkit-text-fill-color: #DADCE0 !important;
         }}
+        /* Primary Capability Tabs: Top-level stTabs navigation */
+        div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+            [role="tablist"] {{
+            display: flex !important;
+            flex-direction: row !important;
+            gap: 8px !important;
+            border-bottom: none !important;
+            padding: 4px !important;
+            background: rgba(15, 23, 42, 0.6) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 10px !important;
+            margin-bottom: 16px !important;
+        }}
+
+        /* Primary Tab items */
+        div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+            [role="tablist"] > div[data-testid="stTab"] {{
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
+            height: 44px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
+            border-radius: 8px !important;
+            padding: 0 12px !important;
+            background-color: rgba(255, 255, 255, 0.04) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            color: #ffffff !important;
+            font-weight: 600;
+            font-size: 0.90rem;
+            cursor: pointer !important;
+            transition: all 0.2s ease-in-out !important;
+            box-sizing: border-box !important;
+        }}
+
+        div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+            [role="tablist"] > div[data-testid="stTab"] p,
+        div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+            [role="tablist"] > div[data-testid="stTab"] div[data-testid="stMarkdownContainer"] p {{
+            color: #ffffff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            font-size: 0.90rem;
+            font-weight: 600;
+        }}
+
+        /* Primary Tab hover */
+        div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+            [role="tablist"] > div[data-testid="stTab"]:hover {{
+            background-color: rgba(255, 255, 255, 0.09) !important;
+            border-color: rgba(255, 255, 255, 0.2) !important;
+            color: #ffffff !important;
+        }}
+
+        /* Primary Tab active / selected */
+        div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+            [role="tablist"] > div[data-testid="stTab"][aria-selected="true"] {{
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+            border: 1px solid #ef4444 !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 14px rgba(220, 38, 38, 0.35),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+        }}
+
+        /* Primary Tab focus ring for keyboard accessibility */
+        div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+            [role="tablist"] > div[data-testid="stTab"]:focus-visible {{
+            outline: 2px solid #ef4444 !important;
+            outline-offset: 2px !important;
+        }}
+
+        /* Hide default Streamlit bottom bar indicator for primary tabs */
+        div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+            [role="tablist"] > div[data-testid="stTab"] .react-aria-SelectionIndicator {{
+            display: none !important;
+        }}
+
+        /* Secondary Tabs (e.g. V1 Journey Layers sub-tabs inside stTabPanel) */
+        div[data-testid="stTabPanel"] div[data-testid="stTabs"] [role="tablist"] {{
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 6px !important;
+            background: rgba(15, 23, 42, 0.4) !important;
+            border: 1px solid rgba(255, 255, 255, 0.05) !important;
+            border-radius: 8px !important;
+            padding: 4px !important;
+            margin-top: 4px !important;
+            margin-bottom: 14px !important;
+            border-bottom: none !important;
+        }}
+
+        div[data-testid="stTabPanel"] div[data-testid="stTabs"]
+            [role="tablist"] > div[data-testid="stTab"] {{
+            height: 36px !important;
+            padding: 0 12px !important;
+            border-radius: 6px !important;
+            background-color: transparent !important;
+            border: 1px solid transparent !important;
+            color: rgba(255, 255, 255, 0.7) !important;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            transition: all 0.15s ease-in-out !important;
+        }}
+
+        div[data-testid="stTabPanel"] div[data-testid="stTabs"]
+            [role="tablist"] > div[data-testid="stTab"] p,
+        div[data-testid="stTabPanel"] div[data-testid="stTabs"]
+            [role="tablist"] > div[data-testid="stTab"] div[data-testid="stMarkdownContainer"] p {{
+            color: rgba(255, 255, 255, 0.7) !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }}
+
+        div[data-testid="stTabPanel"] div[data-testid="stTabs"]
+            [role="tablist"] > div[data-testid="stTab"]:hover {{
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            color: #ffffff !important;
+        }}
+
+        div[data-testid="stTabPanel"] div[data-testid="stTabs"]
+            [role="tablist"] > div[data-testid="stTab"]:hover p,
+        div[data-testid="stTabPanel"] div[data-testid="stTabs"]
+            [role="tablist"] > div[data-testid="stTab"]:hover
+            div[data-testid="stMarkdownContainer"] p {{
+            color: #ffffff !important;
+        }}
+
+        /* Secondary active tab: restrained red underline / pill */
+        div[data-testid="stTabPanel"] div[data-testid="stTabs"]
+            [role="tablist"] > div[data-testid="stTab"][aria-selected="true"] {{
+            background-color: rgba(220, 38, 38, 0.15) !important;
+            border: 1px solid rgba(239, 68, 68, 0.4) !important;
+            border-bottom: 2px solid #ef4444 !important;
+            color: #ffffff !important;
+        }}
+
+        div[data-testid="stTabPanel"] div[data-testid="stTabs"]
+            [role="tablist"] > div[data-testid="stTab"][aria-selected="true"] p,
+        div[data-testid="stTabPanel"] div[data-testid="stTabs"]
+            [role="tablist"] > div[data-testid="stTab"][aria-selected="true"]
+            div[data-testid="stMarkdownContainer"] p {{
+            color: #ffffff !important;
+            font-weight: 600 !important;
+        }}
+
+        div[data-testid="stTabPanel"] div[data-testid="stTabs"]
+            [role="tablist"] > div[data-testid="stTab"]:focus-visible {{
+            outline: 2px solid #ef4444 !important;
+            outline-offset: 1px !important;
+        }}
+
+        div[data-testid="stTabPanel"] div[data-testid="stTabs"]
+            [role="tablist"] > div[data-testid="stTab"] .react-aria-SelectionIndicator {{
+            display: none !important;
+        }}
+
+        /* Mobile / Narrow screen responsiveness */
+        @media (max-width: 768px) {{
+            div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+                [role="tablist"] {{
+                flex-wrap: wrap !important;
+            }}
+            div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+                [role="tablist"] > div[data-testid="stTab"] {{
+                flex: 1 1 calc(50% - 8px) !important;
+                min-width: 140px !important;
+                height: 40px !important;
+                font-size: 0.82rem !important;
+            }}
+            div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+                [role="tablist"] > div[data-testid="stTab"] p,
+            div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+                [role="tablist"] > div[data-testid="stTab"]
+                div[data-testid="stMarkdownContainer"] p {{
+                font-size: 0.82rem !important;
+            }}
+        }}
+
+        /* Accessibility: prefers-reduced-motion fallback */
+        @media (prefers-reduced-motion: reduce) {{
+            div[data-testid="stTabs"] > div[role="tablist"] > div[data-testid="stTab"] {{
+                transition: none !important;
+            }}
+        }}
         </style>
         <div>
             <div class="app-title-container">
