@@ -25,9 +25,6 @@ CONFIGURE_BIGQUERY_IAM="${CONFIGURE_BIGQUERY_IAM:-true}"
 # 1. Verify required CLI tools
 command -v gcloud >/dev/null 2>&1 || { echo "❌ ERROR: gcloud CLI is required but not installed."; exit 1; }
 command -v docker >/dev/null 2>&1 || { echo "❌ ERROR: docker is required but not installed."; exit 1; }
-if [[ "${CONFIGURE_BIGQUERY_IAM}" == "true" ]]; then
-  command -v bq >/dev/null 2>&1 || { echo "❌ ERROR: bq CLI is required when CONFIGURE_BIGQUERY_IAM=true."; exit 1; }
-fi
 
 # 2. Determine unique image tag
 if git rev-parse --short HEAD >/dev/null 2>&1; then
@@ -74,9 +71,11 @@ if [[ "${CONFIGURE_BIGQUERY_IAM}" == "true" ]]; then
     --quiet
 
   echo "  - Granting dataset-level roles/bigquery.dataEditor on ${PROJECT_ID}:${BIGQUERY_DATASET}..."
-  bq --project_id="${PROJECT_ID}" update --dataset \
-    --add_iam_member="serviceAccount:${SA_EMAIL}:roles/bigquery.dataEditor" \
-    "${PROJECT_ID}:${BIGQUERY_DATASET}"
+  gcloud alpha bq datasets add-iam-policy-binding "${BIGQUERY_DATASET}" \
+    --project="${PROJECT_ID}" \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/bigquery.dataEditor" \
+    --quiet
 
   echo "✓ BigQuery IAM permissions configured successfully."
 else
