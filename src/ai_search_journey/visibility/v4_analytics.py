@@ -7,6 +7,7 @@ from typing import Any, Literal, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from ai_search_journey.visibility.bigquery_repository import BigQueryDependencyError
 from ai_search_journey.visibility.bigquery_schema import (
     TABLE_BRAND_OBSERVATIONS,
     TABLE_CITATIONS,
@@ -29,10 +30,6 @@ except ImportError:
 
 class AnalyticsValidationError(ValueError):
     """Raised when an analytics request fails validation."""
-
-
-class BigQueryDependencyError(ImportError):
-    """Raised when BigQuery optional dependencies are not installed."""
 
 
 class AnalyticsDatabaseError(Exception):
