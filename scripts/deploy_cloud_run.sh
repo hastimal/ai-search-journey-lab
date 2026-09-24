@@ -4,6 +4,7 @@ set -euo pipefail
 # ==============================================================================
 # Deploy AI Search Journey Lab to Google Cloud Run
 # Builds multi-arch / linux/amd64 Docker image, pushes to Artifact Registry,
+# optionally configures V3 BigQuery dataset/project IAM permissions idempotently,
 # deploys to Cloud Run with Secret Manager mounting, and verifies health.
 # ==============================================================================
 
@@ -13,6 +14,13 @@ REPOSITORY="${REPOSITORY:-ai-search-journey}"
 SERVICE="${SERVICE:-ai-search-journey-lab}"
 IMAGE_NAME="${IMAGE_NAME:-ai-search-journey-lab}"
 SERVICE_ACCOUNT_NAME="${SERVICE_ACCOUNT_NAME:-ai-search-journey-runner}"
+SA_EMAIL="${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+
+BIGQUERY_PROJECT="${BIGQUERY_PROJECT:-ai-search-journey-lab}"
+BIGQUERY_DATASET="${BIGQUERY_DATASET:-ai_search_journey_v3}"
+BIGQUERY_LOCATION="${BIGQUERY_LOCATION:-US}"
+GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.6-flash}"
+CONFIGURE_BIGQUERY_IAM="${CONFIGURE_BIGQUERY_IAM:-true}"
 
 # 1. Verify required CLI tools
 command -v gcloud >/dev/null 2>&1 || { echo "❌ ERROR: gcloud CLI is required but not installed."; exit 1; }
@@ -28,15 +36,15 @@ fi
 
 IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}"
 LATEST_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE_NAME}:latest"
-SA_EMAIL="${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 
 echo "======================================================================"
 echo "🚀 Deploying AI Search Journey Lab to Google Cloud Run"
-echo "Project:          ${PROJECT_ID}"
-echo "Region:           ${REGION}"
-echo "Service:          ${SERVICE}"
-echo "Image URI:        ${IMAGE_URI}"
-echo "Service Account:  ${SA_EMAIL}"
+echo "Project:                ${PROJECT_ID}"
+echo "Region:                 ${REGION}"
+echo "Service:                ${SERVICE}"
+echo "Image URI:              ${IMAGE_URI}"
+echo "Service Account:        ${SA_EMAIL}"
+echo "Configure BigQuery IAM: ${CONFIGURE_BIGQUERY_IAM}"
 echo "======================================================================"
 
 # 3. Configure Docker auth for Artifact Registry
@@ -52,7 +60,28 @@ docker buildx build \
   --push \
   .
 
-# 5. Deploy to Google Cloud Run
+# 5. Configure BigQuery IAM permissions (idempotent)
+if [[ "${CONFIGURE_BIGQUERY_IAM}" == "true" ]]; then
+  echo "🔐 Configuring BigQuery IAM permissions for ${SA_EMAIL}..."
+
+  echo "  - Granting project-level roles/bigquery.jobUser..."
+  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/bigquery.jobUser" \
+    --quiet
+
+  echo "  - Granting project-level roles/bigquery.dataEditor..."
+  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/bigquery.dataEditor" \
+    --quiet
+
+  echo "✓ BigQuery IAM permissions configured successfully."
+else
+  echo "⏩ Skipping BigQuery IAM configuration (CONFIGURE_BIGQUERY_IAM=false)."
+fi
+
+# 6. Deploy to Google Cloud Run
 echo "☁️ Deploying service '${SERVICE}' to Cloud Run..."
 gcloud run deploy "${SERVICE}" \
   --image="${IMAGE_URI}" \
@@ -64,11 +93,12 @@ gcloud run deploy "${SERVICE}" \
   --cpu=2 \
   --timeout=300 \
   --service-account="${SA_EMAIL}" \
+  --set-env-vars="BIGQUERY_PROJECT=${BIGQUERY_PROJECT},BIGQUERY_DATASET=${BIGQUERY_DATASET},BIGQUERY_LOCATION=${BIGQUERY_LOCATION},GEMINI_MODEL=${GEMINI_MODEL}" \
   --set-secrets="GEMINI_API_KEY=gemini-api-key:latest,GOOGLE_MAPS_API_KEY=google-maps-api-key:latest" \
   --allow-unauthenticated \
   --quiet
 
-# 6. Retrieve deployed revision and service URL
+# 7. Retrieve deployed revision and service URL
 REVISION="$(gcloud run services describe "${SERVICE}" --region="${REGION}" --project="${PROJECT_ID}" --format='value(status.latestReadyRevisionName)')"
 SERVICE_URL="$(gcloud run services describe "${SERVICE}" --region="${REGION}" --project="${PROJECT_ID}" --format='value(status.url)')"
 
@@ -80,7 +110,7 @@ echo "Latest Revision:  ${REVISION}"
 echo "Service URL:      ${SERVICE_URL}"
 echo "======================================================================"
 
-# 7. Run health check against deployed service
+# 8. Run health check against deployed service
 echo "🩺 Verifying service health at ${SERVICE_URL}/_stcore/health..."
 HEALTH_RESPONSE="$(curl -fsS --max-time 15 "${SERVICE_URL}/_stcore/health" || true)"
 

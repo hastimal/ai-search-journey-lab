@@ -562,7 +562,8 @@ def render_visibility_tab(journey: Optional[JourneyResult]) -> None:
 
         # Select Repository
         repository: VisibilityRepository
-        if bq_available and storage_choice == "BigQuery history":
+        is_bq_selected = bq_available and storage_choice == "BigQuery history"
+        if is_bq_selected:
             try:
                 from ai_search_journey.visibility.bigquery_repository import (
                     BigQueryVisibilityRepository,
@@ -592,9 +593,16 @@ def render_visibility_tab(journey: Optional[JourneyResult]) -> None:
                 st.session_state["v3_scan_result"] = scan_result
                 st.session_state["v3_active_target_id"] = target_profile.brand_id
                 st.session_state["v3_active_repo"] = repository
-                st.success(
-                    f"✓ Visibility scan completed and saved (Scan ID: `{scan_result.scan_id}`)."
-                )
+                if is_bq_selected:
+                    st.success(
+                        "✓ Visibility scan completed and saved to BigQuery "
+                        f"(Scan ID: `{scan_result.scan_id}`)."
+                    )
+                else:
+                    st.success(
+                        "✓ Visibility scan completed and saved for this session only "
+                        f"(Scan ID: `{scan_result.scan_id}`)."
+                    )
         except DuplicateScanError as dup_err:
             st.warning(f"⚠️ Duplicate Scan: {dup_err}")
         except (IncompleteJourneyError, InconsistentScanError) as val_err:

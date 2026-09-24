@@ -210,9 +210,11 @@ def test_save_emits_one_transactional_script_with_lock_gate() -> None:
 
     assert idx_begin < idx_lock < idx_marker_read < idx_fact_write < idx_marker_write < idx_commit
 
-    # Serialization lock row presence check is enforced
+    # Serialization lock row presence check and valid BigQuery RAISE syntax are enforced
     assert "IF @@row_count = 0 THEN" in sql
-    assert "Repository lock row missing. Run setup_bigquery_v3.py --apply" in sql
+    import re
+    assert re.search(r"RAISE USING MESSAGE =\s*'Repository lock row missing", sql)
+    assert re.search(r"RAISE USING MESSAGE =\s*'DUPLICATE_SCAN_ERROR:", sql)
 
     # Orphan cleanup in partition is included
     assert "DELETE FROM `my-project.ai_search_journey_v3.visibility_scans`" in sql
@@ -236,6 +238,83 @@ def test_transaction_rollback_on_sdk_error_wraps_cause() -> None:
         repo.save_bundle(bundle)
 
     assert isinstance(exc_info.value.__cause__, RuntimeError)
+
+
+def test_concurrency_retry_preserves_idempotency(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Retryable concurrency failure is retried, succeeds, and preserves idempotency."""
+    client = FakeBigQueryClient()
+    repo = BigQueryVisibilityRepository(project_id="my-project", client=client)
+    bundle = _make_test_bundle("scan_retry")
+
+    attempts = 0
+
+    def _handler(sql: str, params: list[Any]) -> list[Any]:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise Exception(
+                "Transaction is aborted due to concurrent update against table "
+                "my-project.ai_search_journey_v3.repository_locks"
+            )
+        return []
+
+    client.query_handler = _handler
+    monkeypatch.setattr("time.sleep", lambda x: None)
+    monkeypatch.setattr("random.uniform", lambda a, b: 0.0)
+
+    repo.save_bundle(bundle)
+
+    assert attempts == 2
+    assert len(client.executed_queries) == 2
+    assert "BEGIN TRANSACTION;" in client.executed_queries[0][0]
+    assert client.executed_queries[0][0] == client.executed_queries[1][0]
+
+
+def test_non_retryable_error_is_not_retried(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A non-retryable arbitrary error is not retried."""
+    client = FakeBigQueryClient()
+    repo = BigQueryVisibilityRepository(project_id="my-project", client=client)
+    bundle = _make_test_bundle("scan_no_retry")
+
+    attempts = 0
+
+    def _handler(sql: str, params: list[Any]) -> list[Any]:
+        nonlocal attempts
+        attempts += 1
+        raise Exception("Some arbitrary BigQuery error")
+
+    client.query_handler = _handler
+    monkeypatch.setattr("time.sleep", lambda x: None)
+
+    with pytest.raises(BigQueryWriteError, match="Some arbitrary BigQuery error"):
+        repo.save_bundle(bundle)
+
+    assert attempts == 1
+
+
+def test_retry_exhaustion_returns_safe_expected_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Retry exhaustion returns the safe expected error."""
+    client = FakeBigQueryClient()
+    repo = BigQueryVisibilityRepository(project_id="my-project", client=client)
+    bundle = _make_test_bundle("scan_exhaust")
+
+    attempts = 0
+
+    def _handler(sql: str, params: list[Any]) -> list[Any]:
+        nonlocal attempts
+        attempts += 1
+        raise Exception(
+            "Transaction is aborted due to concurrent update against table ... repository_locks"
+        )
+
+    client.query_handler = _handler
+    monkeypatch.setattr("time.sleep", lambda x: None)
+    monkeypatch.setattr("random.uniform", lambda a, b: 0.0)
+
+    with pytest.raises(BigQueryWriteError, match="Another visibility write is still in progress"):
+        repo.save_bundle(bundle)
+
+    assert attempts == 4
 
 
 def test_missing_lock_row_fails_with_setup_instructions() -> None:

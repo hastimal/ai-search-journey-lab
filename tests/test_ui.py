@@ -1,4 +1,4 @@
-"""Unit tests for UI formatting and presentation components."""
+import unittest.mock as mock
 
 from ai_search_journey.models import (
     Candidate,
@@ -12,6 +12,7 @@ from ai_search_journey.models import (
     RankedCandidate,
     SearchIntent,
 )
+from ai_search_journey.ui_assets import render_app_title
 from ai_search_journey.ui_formatters import (
     build_constraint_matrix_data,
     format_candidate_summary_card,
@@ -471,6 +472,19 @@ def test_render_execution_timeline_with_full_journey() -> None:
     render_execution_timeline(trace, journey=journey)
 
 
+def test_render_app_title_includes_tab_navigation_styles(monkeypatch) -> None:
+    """Verify primary and secondary tab styling rules are included in render_app_title CSS."""
+    rendered_markdown = []
 
+    def mock_markdown(content: str, *args, **kwargs):
+        rendered_markdown.append(content)
 
+    with mock.patch("streamlit.markdown", side_effect=mock_markdown):
+        render_app_title()
+
+    full_css = "".join(rendered_markdown)
+    assert "Primary Capability Tabs" in full_css
+    assert "Secondary Tabs" in full_css
+    assert "div[data-testid=\"stTabs\"]" in full_css
+    assert "prefers-reduced-motion" in full_css
 

@@ -1,5 +1,4 @@
-"""Unit tests for Google ADK Search Journey Orchestration."""
-
+from typing import Optional
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -17,7 +16,9 @@ from ai_search_journey.models import (
     ConstraintStatus,
     FanoutQuery,
     GroundedAnswer,
+    JourneyExecutionTrace,
     JourneyResult,
+    JourneyStepTiming,
     ReferenceLocation,
     SearchGroundingResult,
     SearchIntent,
@@ -338,9 +339,9 @@ async def test_adk_step_failure_captured_in_trace() -> None:
         mock_intent.side_effect = RuntimeError("Gemini API connection error")
 
         agent = SearchJourneyAgent()
-        last_trace = None
+        last_trace: Optional[JourneyExecutionTrace] = None
 
-        def on_step(step: object, trace: object) -> None:
+        def on_step(step: Optional[JourneyStepTiming], trace: JourneyExecutionTrace) -> None:
             nonlocal last_trace
             last_trace = trace
 
@@ -353,3 +354,58 @@ async def test_adk_step_failure_captured_in_trace() -> None:
         assert intent_step.status.value == "failed"
         assert "Gemini API connection error" in (intent_step.error or "")
 
+
+@pytest.mark.asyncio
+async def test_adk_answer_failure_retains_retrieval_and_ranking() -> None:
+    """Verify journey completes and retains rankings/evidence when answer synthesis fails."""
+    sample_intent = SearchIntent(category="coffee shop")
+    c1 = Candidate(place_id="c1", name="Place Alpha", primary_type="coffee_shop")
+
+    with (
+        patch(
+            "ai_search_journey.adk.agent.extract_intent", new_callable=AsyncMock
+        ) as mock_intent,
+        patch(
+            "ai_search_journey.adk.agent.reference_location_tool", new_callable=AsyncMock
+        ) as mock_ref,
+        patch(
+            "ai_search_journey.adk.agent.generate_fanout", new_callable=AsyncMock
+        ) as mock_fanout,
+        patch(
+            "ai_search_journey.adk.agent.places_retrieval_tool", new_callable=AsyncMock
+        ) as mock_places,
+        patch(
+            "ai_search_journey.adk.agent.search_grounding_tool", new_callable=AsyncMock
+        ) as mock_search,
+        patch(
+            "ai_search_journey.adk.agent.generate_grounded_answer", new_callable=AsyncMock
+        ) as mock_ans,
+    ):
+        mock_intent.return_value = sample_intent
+        mock_ref.return_value = None
+        mock_fanout.return_value = [
+            FanoutQuery(
+                task_id="F1", goal="Discovery", query="coffee", tool=ToolName.GOOGLE_PLACES
+            )
+        ]
+        mock_places.return_value = [c1]
+        mock_search.return_value = SearchGroundingResult(
+            task_id="F2", planner_query="test", grounded_text=""
+        )
+        mock_ans.side_effect = RuntimeError("Gemini models unavailable on all retries")
+
+        agent = SearchJourneyAgent()
+        journey = await agent.run("Find coffee")
+
+        # Journey is returned successfully with answer=None
+        assert journey is not None
+        assert journey.answer is None
+        assert len(journey.ranking) == 1
+        assert journey.ranking[0].candidate.name == "Place Alpha"
+        assert journey.execution_trace is not None
+        assert journey.execution_trace.is_complete is True
+        assert journey.execution_trace.failed_step_key == "answer"
+
+        ans_step = [s for s in journey.execution_trace.steps if s.key == "answer"][0]
+        assert ans_step.status.value == "failed"
+        assert ans_step.detail == "Grounded answer unavailable"

@@ -14,6 +14,7 @@ The V4 implementation leverages an isolated local MCP server and an ADK orchestr
 - **No Hallucination**: The agent's ADK instructions strictly prohibit inventing metrics, scans, or dates, and require the answer to explicitly state the applied date range.
 
 ## Supported MCP Tools
+- `get_available_history`: Discovers persisted scan count, date bounds, brand IDs, and recent scan windows.
 - `get_visibility_summary`: Aggregates mention/recommendation rates.
 - `get_brand_trend`: Chronological data points.
 - `compare_brands`: Direct competitor metrics comparison.

@@ -4,53 +4,56 @@ from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
+from ai_search_journey.config import settings
 from ai_search_journey.visibility.v4_analytics import (
+    AvailableHistoryRequest,
     BigQueryVisibilityAnalyticsRepository,
     BrandTrendRequest,
-    BrandTrendResult,
     CitationAnalysisRequest,
-    CitationAnalysisResult,
     CompetitorComparisonRequest,
-    CompetitorComparisonResult,
     FanoutGapRequest,
-    FanoutGapResult,
     VisibilityAnalyticsRepository,
     VisibilitySummaryRequest,
-    VisibilitySummaryResult,
 )
 
 server = MCPServer("AI Visibility Analytics V4")
 
-# Initialize repository (Mock fallback for tests/offline demo)
-class LocalMockRepo:
-    def get_visibility_summary(self, request: Any) -> Any:
-        return VisibilitySummaryResult(
-            brand_id=request.brand_id,
-            total_scans=0,
-            mention_rate=0.0,
-            recommendation_rate=0.0,
-            citation_rate=0.0
-        )
-    def get_brand_trend(self, request: Any) -> Any:
-        return BrandTrendResult(brand_id=request.brand_id, trends=[])
-    def compare_brands(self, request: Any) -> Any:
-        return CompetitorComparisonResult(metrics=[])
-    def analyze_citations(self, request: Any) -> Any:
-        return CitationAnalysisResult(brand_id=request.brand_id, top_citations=[])
-    def find_fanout_gaps(self, request: Any) -> Any:
-        return FanoutGapResult(brand_id=request.brand_id, gaps=[])
 
 def _get_repository() -> VisibilityAnalyticsRepository:
-    if os.environ.get("USE_MOCK_VISIBILITY_REPO") == "1":
-        return LocalMockRepo() 
+    project_id = (
+        settings.bigquery_project
+        or os.environ.get("GOOGLE_CLOUD_PROJECT")
+        or os.environ.get("BIGQUERY_PROJECT")
+    )
+    if not project_id:
+        raise RuntimeError("BigQuery repository unavailable: BIGQUERY_PROJECT not configured")
     try:
         return BigQueryVisibilityAnalyticsRepository(
-            project_id=os.environ.get("GOOGLE_CLOUD_PROJECT", "test-project")
+            project_id=project_id,
+            dataset_id=settings.bigquery_dataset,
+            location=settings.bigquery_location,
         )
-    except Exception:
-        return LocalMockRepo()
+    except Exception as e:
+        raise RuntimeError(f"BigQuery repository unavailable: {e}") from e
 
-repo = _get_repository()
+
+repo: VisibilityAnalyticsRepository | None = None
+
+
+def get_repo() -> VisibilityAnalyticsRepository:
+    global repo
+    if repo is None:
+        repo = _get_repository()
+    return repo
+
+
+@server.tool()
+def get_available_history(lookback_days: int = 365) -> dict[str, Any]:
+    """Discovers available historical scan metadata, date bounds, total scans,
+    distinct brands, and recent scan windows in BigQuery."""
+    req = AvailableHistoryRequest(lookback_days=lookback_days)
+    return get_repo().get_available_history(req).model_dump()
+
 
 @server.tool()
 def get_visibility_summary(start_date: str, end_date: str, brand_id: str) -> dict[str, Any]:
@@ -61,7 +64,7 @@ def get_visibility_summary(start_date: str, end_date: str, brand_id: str) -> dic
     req = VisibilitySummaryRequest.model_validate({
         "start_date": sd, "end_date": ed, "brand_id": brand_id
     })
-    return repo.get_visibility_summary(req).model_dump()
+    return get_repo().get_visibility_summary(req).model_dump()
 
 @server.tool()
 def get_brand_trend(start_date: str, end_date: str, brand_id: str) -> dict[str, Any]:
@@ -72,7 +75,7 @@ def get_brand_trend(start_date: str, end_date: str, brand_id: str) -> dict[str, 
     req = BrandTrendRequest.model_validate({
         "start_date": sd, "end_date": ed, "brand_id": brand_id
     })
-    return repo.get_brand_trend(req).model_dump()
+    return get_repo().get_brand_trend(req).model_dump()
 
 @server.tool()
 def compare_brands(start_date: str, end_date: str, brand_ids: list[str]) -> dict[str, Any]:
@@ -82,7 +85,7 @@ def compare_brands(start_date: str, end_date: str, brand_ids: list[str]) -> dict
     req = CompetitorComparisonRequest.model_validate({
         "start_date": sd, "end_date": ed, "brand_ids": brand_ids
     })
-    return repo.compare_brands(req).model_dump()
+    return get_repo().compare_brands(req).model_dump()
 
 @server.tool()
 def analyze_citations(
@@ -95,7 +98,7 @@ def analyze_citations(
     req = CitationAnalysisRequest.model_validate({
         "start_date": sd, "end_date": ed, "brand_id": brand_id, "limit": limit
     })
-    return repo.analyze_citations(req).model_dump()
+    return get_repo().analyze_citations(req).model_dump()
 
 @server.tool()
 def find_fanout_gaps(
@@ -108,7 +111,7 @@ def find_fanout_gaps(
     req = FanoutGapRequest.model_validate({
         "start_date": sd, "end_date": ed, "brand_id": brand_id, "limit": limit
     })
-    return repo.find_fanout_gaps(req).model_dump()
+    return get_repo().find_fanout_gaps(req).model_dump()
 
 if __name__ == "__main__":
     server.run()

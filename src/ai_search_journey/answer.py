@@ -1,7 +1,8 @@
-"""Gemini Grounded Final Answer module for AI Search Journey."""
-
+import asyncio
 import json
-from typing import Any, Optional
+import random
+import re
+from typing import Any, Callable, Optional
 
 from google import genai
 from google.genai import types
@@ -221,6 +222,155 @@ def _validate_and_assemble_grounded_answer(
     )
 
 
+def redact_secrets(text: str) -> str:
+    """Ensure API keys and secrets are redacted from strings and traces."""
+    if not text:
+        return ""
+    # Redact standard Google API keys (AIza...)
+    sanitized = re.sub(r"AIza[0-9A-Za-z-_]{35}", "[REDACTED_API_KEY]", text)
+    # Redact explicit key= or token= parameters
+    sanitized = re.sub(
+        r"(key|api_key|token|secret)=([^\s&,]+)",
+        r"\1=[REDACTED]",
+        sanitized,
+        flags=re.IGNORECASE,
+    )
+    return sanitized
+
+
+def is_transient_error(exc: Exception) -> bool:
+    """Determine if a Gemini API or network error is transient and eligible for retry/fallback.
+
+    Transient errors (eligible for retry on primary, and fallback if exhausted):
+    - 429: Too Many Requests / Resource Exhausted / Rate limit / Quota
+    - 503: Service Unavailable
+    - 504: Gateway Timeout / Deadline Exceeded
+    - Network timeout / connection reset / disconnect errors
+      (e.g. httpx.TimeoutException, TimeoutError)
+
+    Non-retryable errors (NEVER retried or fallen back to):
+    - Auth / permission errors (401 Unauthorized, 403 Forbidden, PERMISSION_DENIED)
+    - Request validation errors (400 Bad Request, INVALID_ARGUMENT, 422 Unprocessable)
+    - Safety / Policy block errors (finish_reason=SAFETY, BLOCKED, etc.)
+    - Local validation errors (ValueError, ValidationError, TypeError)
+    - 404 Not Found
+    """
+    if isinstance(exc, (ValueError, TypeError, KeyError, AttributeError, AssertionError)):
+        return False
+
+    if isinstance(exc, (TimeoutError, ConnectionError, asyncio.TimeoutError)):
+        return True
+
+    try:
+        import httpx
+
+        if isinstance(exc, httpx.TimeoutException) or isinstance(exc, httpx.NetworkError):
+            return True
+        if isinstance(exc, httpx.HTTPStatusError):
+            code = exc.response.status_code
+            if code in (429, 503, 504):
+                return True
+            if 400 <= code < 600:
+                return False
+    except ImportError:
+        pass
+
+    status_code = getattr(exc, "code", None)
+    if status_code is not None:
+        try:
+            code_int = int(status_code)
+            if code_int in (429, 503, 504):
+                return True
+            if 400 <= code_int < 600:
+                return False
+        except (ValueError, TypeError):
+            pass
+
+    err_str = str(exc).lower()
+
+    non_retryable_signals = [
+        "permission_denied",
+        "permission denied",
+        "unauthenticated",
+        "unauthorized",
+        "invalid_argument",
+        "invalid argument",
+        "api_key_invalid",
+        "api key not valid",
+        "safety",
+        "blocked",
+        "not_found",
+        "not found",
+        "400",
+        "401",
+        "403",
+        "404",
+        "500",
+        "502",
+    ]
+    for signal in non_retryable_signals:
+        if signal in err_str:
+            return False
+
+    transient_signals = [
+        "429",
+        "resource_exhausted",
+        "resource exhausted",
+        "rate limit",
+        "rate_limit",
+        "quota",
+        "503",
+        "unavailable",
+        "504",
+        "deadline_exceeded",
+        "deadline exceeded",
+        "timed out",
+        "timeout",
+        "connection reset",
+        "connection error",
+        "service unavailable",
+    ]
+    for signal in transient_signals:
+        if signal in err_str:
+            return True
+
+    return False
+
+
+async def _execute_gemini_request(
+    client: genai.Client,
+    model: str,
+    prompt_json: str,
+) -> GeminiGroundedAnswerResponse:
+    """Execute a single Gemini request and parse structured response."""
+    response = await client.aio.models.generate_content(
+        model=model,
+        contents=prompt_json,
+        config=types.GenerateContentConfig(
+            system_instruction=ANSWER_SYSTEM_INSTRUCTION,
+            response_mime_type="application/json",
+            response_schema=GeminiGroundedAnswerResponse,
+        ),
+    )
+
+    raw_response: Optional[GeminiGroundedAnswerResponse] = None
+
+    if hasattr(response, "parsed") and isinstance(response.parsed, GeminiGroundedAnswerResponse):
+        raw_response = response.parsed
+    elif hasattr(response, "text") and response.text:
+        try:
+            raw_response = GeminiGroundedAnswerResponse.model_validate_json(response.text)
+        except Exception as exc:
+            raise ValueError(
+                f"Failed to parse Gemini answer response as GeminiGroundedAnswerResponse: {exc}"
+            ) from exc
+
+    if raw_response is None:
+        raise ValueError("Gemini API returned an empty or unparseable answer response.")
+
+    return raw_response
+
+
 async def generate_grounded_answer(
     question: str,
     intent: SearchIntent,
@@ -228,8 +378,20 @@ async def generate_grounded_answer(
     *,
     max_candidates: int = 3,
     client: Optional[genai.Client] = None,
+    primary_model: Optional[str] = None,
+    fallback_model: Optional[str] = None,
+    max_primary_attempts: int = 2,
+    initial_delay: float = 0.5,
+    on_trace: Optional[Callable[[str], None]] = None,
 ) -> GroundedAnswer:
     """Generate a concise, grounded final answer from deterministically ranked Top candidates.
+
+    Features bounded Gemini resilience:
+    - Retries primary model only for transient errors (429/503/504/timeout), max 2 total attempts.
+    - Exponential backoff with small jitter between retries.
+    - Falls back to gemini_fallback_model (1 attempt) if primary remains transiently unavailable.
+    - Never retries or falls back for auth, permission, validation, safety, or other 4xx errors.
+    - Exposes retry and fallback events in developer trace without leaking secrets.
 
     Args:
         question: Original user query.
@@ -237,6 +399,13 @@ async def generate_grounded_answer(
         ranked_candidates: List of RankedCandidate models from deterministic ranking.
         max_candidates: Number of top candidates to explain (default: 3).
         client: Optional Google GenAI Client (useful for dependency injection / testing).
+        primary_model: Optional primary Gemini model override
+            (defaults to settings.gemini_model).
+        fallback_model: Optional fallback Gemini model override
+            (defaults to settings.gemini_fallback_model).
+        max_primary_attempts: Maximum attempts for primary model (default: 2).
+        initial_delay: Base delay in seconds for exponential backoff (default: 0.5).
+        on_trace: Optional trace callback for resilience event logging.
 
     Returns:
         GroundedAnswer Pydantic model containing structured summary and recommendations.
@@ -247,6 +416,13 @@ async def generate_grounded_answer(
     """
     if not ranked_candidates:
         raise ValueError("Cannot generate grounded answer for empty ranked candidates list.")
+
+    primary = primary_model or settings.gemini_model
+    fallback = fallback_model or settings.gemini_fallback_model
+
+    def trace(msg: str) -> None:
+        if on_trace:
+            on_trace(redact_secrets(msg))
 
     candidates_payload = _format_candidate_evidence_payload(
         ranked_candidates, max_candidates=max_candidates
@@ -266,30 +442,66 @@ async def generate_grounded_answer(
             raise ValueError("GEMINI_API_KEY environment variable is not configured.")
         client = genai.Client(api_key=api_key)
 
-    try:
-        response = await client.aio.models.generate_content(
-            model=settings.gemini_model,
-            contents=prompt_json,
-            config=types.GenerateContentConfig(
-                system_instruction=ANSWER_SYSTEM_INSTRUCTION,
-                response_mime_type="application/json",
-                response_schema=GeminiGroundedAnswerResponse,
-            ),
-        )
-    except Exception as exc:
-        raise RuntimeError(f"Gemini API request failed during answer generation: {exc}") from exc
-
     raw_response: Optional[GeminiGroundedAnswerResponse] = None
+    last_error: Optional[Exception] = None
 
-    if hasattr(response, "parsed") and isinstance(response.parsed, GeminiGroundedAnswerResponse):
-        raw_response = response.parsed
-    elif hasattr(response, "text") and response.text:
+    # 1. Attempt Primary Model (max_primary_attempts total attempts)
+    for attempt in range(1, max_primary_attempts + 1):
         try:
-            raw_response = GeminiGroundedAnswerResponse.model_validate_json(response.text)
+            trace(
+                f"Requesting grounded answer with primary model '{primary}' "
+                f"(attempt {attempt}/{max_primary_attempts})..."
+            )
+            raw_response = await _execute_gemini_request(client, primary, prompt_json)
+            trace(f"Primary model '{primary}' successfully generated grounded answer.")
+            break
         except Exception as exc:
+            last_error = exc
+            clean_err = redact_secrets(str(exc))
+
+            if not is_transient_error(exc):
+                trace(
+                    f"Primary model '{primary}' failed with non-retryable error: {clean_err}. "
+                    f"Skipping retry and fallback."
+                )
+                raise RuntimeError(
+                    f"Gemini API request failed on primary model '{primary}' "
+                    f"with non-retryable error: {clean_err}"
+                ) from exc
+
+            if attempt < max_primary_attempts:
+                jitter = random.uniform(0.01, 0.05) if initial_delay > 0 else 0.0
+                delay = (
+                    (initial_delay * (2 ** (attempt - 1))) + jitter
+                    if initial_delay > 0
+                    else 0.0
+                )
+                trace(
+                    f"Primary model '{primary}' attempt {attempt} failed with transient error: "
+                    f"{clean_err}. Retrying attempt {attempt + 1}/{max_primary_attempts} "
+                    f"in {delay:.2f}s..."
+                )
+                if delay > 0:
+                    await asyncio.sleep(delay)
+            else:
+                trace(
+                    f"Primary model '{primary}' transiently unavailable after "
+                    f"{max_primary_attempts} attempts: {clean_err}."
+                )
+
+    # 2. Fallback Model Attempt (1 attempt if primary failed transiently)
+    if raw_response is None and last_error is not None:
+        trace(f"Switching to fallback model '{fallback}' for grounded answer generation...")
+        try:
+            raw_response = await _execute_gemini_request(client, fallback, prompt_json)
+            trace(f"Fallback model '{fallback}' successfully generated grounded answer.")
+        except Exception as fallback_exc:
+            clean_fb_err = redact_secrets(str(fallback_exc))
+            trace(f"Fallback model '{fallback}' failed: {clean_fb_err}.")
             raise RuntimeError(
-                f"Failed to parse Gemini answer response as GeminiGroundedAnswerResponse: {exc}"
-            ) from exc
+                f"Gemini API request failed on both primary ('{primary}') and "
+                f"fallback ('{fallback}') models: {clean_fb_err}"
+            ) from fallback_exc
 
     if raw_response is None:
         raise RuntimeError("Gemini API returned an empty or unparseable answer response.")

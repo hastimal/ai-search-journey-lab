@@ -17,6 +17,7 @@ class Settings(BaseSettings):
 
     gemini_api_key: Optional[str] = None
     gemini_model: str = "gemini-3.6-flash"
+    gemini_fallback_model: str = "gemini-3.5-flash-lite"
 
     google_maps_api_key: Optional[str] = None
 
@@ -27,6 +28,8 @@ class Settings(BaseSettings):
 
     @field_validator(
         "gemini_api_key",
+        "gemini_model",
+        "gemini_fallback_model",
         "google_maps_api_key",
         "bigquery_project",
         "bigquery_dataset",

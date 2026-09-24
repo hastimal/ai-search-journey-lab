@@ -194,3 +194,49 @@ def test_find_fanout_gaps(
     assert len(result.gaps) == 1
     assert result.gaps[0].query_text == "how to X"
     assert result.gaps[0].miss_count == 3
+
+
+@mock.patch("ai_search_journey.visibility.v4_analytics.bigquery")
+def test_get_available_history_partition_safe(mock_bq: mock.MagicMock) -> None:
+    """Test get_available_history queries partition safely and returns metadata."""
+    from ai_search_journey.visibility.v4_analytics import AvailableHistoryRequest
+
+    mock_client = mock.MagicMock()
+    mock_summary_job = mock.MagicMock()
+    mock_summary_job.result.return_value = [
+        {
+            "earliest_started_at": "2026-09-24T03:03:19.002028+00:00",
+            "latest_started_at": "2026-09-24T04:00:45.255716+00:00",
+            "total_scans": 4,
+            "distinct_brand_ids": ["halcyon_southtown", "kafe_krave"],
+        }
+    ]
+    mock_recent_job = mock.MagicMock()
+    mock_recent_job.result.return_value = [
+        {
+            "scan_id": "scan_5191faf2fb77",
+            "started_at": "2026-09-24T04:00:45.255716+00:00",
+            "brand_id": "halcyon_southtown",
+            "brand_name_snapshot": "Halcyon Southtown",
+            "prompt_text_snapshot": "Find a coffee shop near Geekdom",
+        }
+    ]
+
+    mock_client.query.side_effect = [mock_summary_job, mock_recent_job]
+
+    repo = BigQueryVisibilityAnalyticsRepository(project_id="test", client=mock_client)
+    req = AvailableHistoryRequest(lookback_days=30)
+    result = repo.get_available_history(req)
+
+    assert result.total_scans == 4
+    assert result.earliest_started_at == "2026-09-24T03:03:19.002028+00:00"
+    assert result.latest_started_at == "2026-09-24T04:00:45.255716+00:00"
+    assert "halcyon_southtown" in result.distinct_brand_ids
+    assert len(result.recent_scans) == 1
+    assert result.recent_scans[0].scan_id == "scan_5191faf2fb77"
+
+    assert mock_client.query.call_count == 2
+    for call in mock_client.query.call_args_list:
+        sql = call[0][0]
+        # Must filter on started_at for partition safety
+        assert "started_at >=" in sql

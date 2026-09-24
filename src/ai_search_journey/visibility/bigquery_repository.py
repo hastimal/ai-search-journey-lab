@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import random
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Sequence
 
@@ -50,7 +52,7 @@ class BigQueryWriteError(Exception):
 
 def _get_bigquery_module() -> Any:
     try:
-        from google.cloud import bigquery  # type: ignore[import-untyped]
+        from google.cloud import bigquery
 
         return bigquery
     except ImportError:
@@ -353,9 +355,8 @@ WHERE lock_key = @lock_key;
 
 IF @@row_count = 0 THEN
   ROLLBACK TRANSACTION;
-  RAISE USING MESSAGE (
-    'Repository lock row missing. Run setup_bigquery_v3.py --apply to initialize repository_locks.'
-  );
+  RAISE USING MESSAGE =
+    'Repository lock row missing. Run setup_bigquery_v3.py --apply to initialize repository_locks.';
 END IF;
 
 -- b. Read/check existing bundle_payloads row for scan_id
@@ -372,9 +373,8 @@ IF existing_hash IS NOT NULL THEN
     COMMIT TRANSACTION;
   ELSE
     ROLLBACK TRANSACTION;
-    RAISE USING MESSAGE (
-      'DUPLICATE_SCAN_ERROR: Conflicting scan bundle already exists for scan_id: ' || @scan_id
-    );
+    RAISE USING MESSAGE =
+      'DUPLICATE_SCAN_ERROR: Conflicting scan bundle already exists for scan_id: ' || @scan_id;
   END IF;
 ELSE
   -- e. Remove legacy orphan fact rows in partition, insert facts, insert payload marker
@@ -404,19 +404,41 @@ ELSE
   COMMIT TRANSACTION;
 END IF;"""
 
-        try:
-            self._execute_query(tx_sql, params)
-        except DuplicateScanError:
-            raise
-        except Exception as exc:
-            msg = str(exc)
-            if "DUPLICATE_SCAN_ERROR" in msg:
-                raise DuplicateScanError(
-                    f"Conflicting scan bundle already exists for scan_id '{scan_id}'"
+        # Updated retry logic with bounded exponential backoff and jitter
+        max_attempts = 4  # total attempts including the initial try
+        base_delay = 0.7  # seconds
+        jitter_factor = 0.3  # up to 30% jitter
+
+        for attempt in range(max_attempts):
+            try:
+                self._execute_query(tx_sql, params)
+                return
+            except DuplicateScanError:
+                # Duplicate scans are not retryable
+                raise
+            except Exception as exc:
+                msg = str(exc).lower()
+                # Duplicate scan detection
+                if "duplicate_scan_error" in msg or "duplicate scan" in msg:
+                    raise DuplicateScanError(
+                        f"Conflicting scan bundle already exists for scan_id: {scan_id}"
+                    ) from exc
+                # Concurrency retry detection
+                if "repository_locks" in msg and "concurrent update" in msg:
+                    if attempt < max_attempts - 1:
+                        delay = base_delay * (2 ** attempt)
+                        jitter = random.uniform(0, jitter_factor * delay)
+                        time.sleep(delay + jitter)
+                        continue
+                    # Exhausted retries – raise user‑friendly error
+                    raise BigQueryWriteError(
+                        "Another visibility write is still in progress. "
+                        "Please try again in a moment."
+                    ) from exc
+                # Any other error is non‑retryable
+                raise BigQueryWriteError(
+                    f"Failed to save bundle '{scan_id}' to BigQuery: {exc}"
                 ) from exc
-            raise BigQueryWriteError(
-                f"Failed to save bundle '{scan_id}' to BigQuery: {exc}"
-            ) from exc
 
     def get_bundle(self, scan_id: str) -> VisibilityScanBundle | None:
         """Retrieve bundle by scan_id from bundle_payloads only."""

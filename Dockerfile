@@ -12,7 +12,7 @@ ENV PYTHONUNBUFFERED=1 \
 COPY pyproject.toml README.md ./
 COPY src ./src
 
-RUN pip install --prefix=/install .
+RUN pip install --prefix=/install ".[bigquery,v4-agent]"
 
 # Final runtime stage
 FROM python:3.12-slim

@@ -43,7 +43,7 @@ User Intent ──▶ Query Fan-Out ──▶ Multi-Source Retrieval ──▶ G
 
 ## 2. Demo
 
-The Journey Inspector makes the complete AI search journey visible across three dedicated operational stages: **Search to Decision [V1]**, **Journey Analysis [V2]**, and **AI Visibility [V3]**.
+The Journey Inspector makes the complete AI search journey visible across dedicated operational stages: **Search to Decision [V1]**, **Journey Analysis [V2]**, **AI Visibility [V3]**, and **AI Visibility Agent [V4]**.
 
 > **Important Scope & Architecture Note:**
 > - **Local & Public Demos use Session Only (In-Memory):** In-memory storage is the default mode for local development, Streamlit exploration, and public demos without cloud database setup.
@@ -69,6 +69,21 @@ The Journey Inspector makes the complete AI search journey visible across three 
 *Multi-metric visibility dashboard reporting Brand Presence, Narrative Mention Rate, Recommendation Rate, Owned Citation Rate, and Share of Voice (SOV) against competitors.*
 
 ![AI Visibility V3 Results](assets/screenshots/v3-visibility-results.png)
+
+### Stage 3: AI Visibility [V3] — Interactive Dashboard
+*V3 AI Visibility — configure a target and competitors, run an analysis, and persist optional BigQuery history.*
+
+![V3 AI Visibility GUI](assets/screenshots/v3_visibility_gui.png)
+
+### Stage 4: AI Visibility Agent [V4] — Console Interface
+*V4 AI Visibility Agent — read-only conversational interface grounded in persisted BigQuery visibility history.*
+
+![V4 AI Visibility Agent UI](assets/screenshots/v4_ai_visibility_agent_ui.png)
+
+### Stage 4: AI Visibility Agent [V4] — Grounded Analysis
+*V4 grounded analysis — Gemini uses Google ADK and MCP read-only tools to compare brands, citations, fan-out gaps, and available history.*
+
+![V4 AI Visibility Agent Grounded Analysis](assets/screenshots/v4_ai_visibility_agent.png)
 
 ---
 
@@ -270,19 +285,19 @@ $$\text{Total Score} = \text{Hard Points} + \text{Preference Points} + \text{Pro
 
 | Technology | Role in Architecture |
 | :--- | :--- |
-| **Gemini API (`gemini-2.5-flash`)** | Natural language intent extraction, query fan-out planning, and grounded answer synthesis. |
+| **Gemini API (`gemini-3.6-flash` / `gemini-3.5-flash-lite`)** | Natural language intent extraction, query fan-out planning, and grounded answer synthesis with resilient fallback. |
 | **Google GenAI Python SDK (`google-genai`)** | Official Python interface for structured output schemas and search grounding. |
 | **Google ADK (`google-adk`)** | Agentic orchestration framework structuring reasoning, tools, and execution steps. |
 | **Google Search Grounding** | Web search tool grounding LLM reasoning with real-time web citations and sources. |
 | **Google Places API (New)** | Structured local search, entity details, operating hours, and reference location resolution. |
 | **Google Maps Static API** | Rendered map imagery displaying labeled markers (`A`, `B`, `C`) for top-ranked venues. |
-| **Streamlit** | Interactive Journey Inspector UI for step-by-step pipeline inspection. |
+| **Streamlit** | Interactive Journey Inspector UI for step-by-step pipeline inspection across four capability tabs. |
 | **Pydantic / Pydantic Settings** | Strict schema validation, data modeling, and environment configuration. |
 | **Docker** | Multi-stage, non-root container packaging (`python:3.12-slim`). |
 | **Google Artifact Registry** | Secure container image repository in GCP. |
 | **Google Cloud Run** | Fully managed serverless container runtime. |
 | **Google Secret Manager** | Secure, decoupled runtime storage for Gemini and Google Maps API keys. |
-| **pytest / Ruff / mypy** | Unit testing (140+ tests), linting, and strict static type checking. |
+| **pytest / Ruff / mypy** | Unit testing (340+ tests), linting, and strict static type checking. |
 
 ---
 
@@ -297,6 +312,7 @@ ai-search-journey-lab/
 │   └── google-for-startup.webp
 ├── scripts/                         # Automation and demo CLI scripts
 │   ├── bootstrap_gcp.sh             # One-time GCP infrastructure provisioning
+│   ├── bootstrap_bigquery_v3.sh     # BigQuery dataset & table setup for V3/V4
 │   ├── deploy_cloud_run.sh          # Automated Docker build, push, and Cloud Run deploy
 │   ├── delete_cloud_run.sh          # Safe cleanup script for Cloud Run service & images
 │   ├── run_app.py                   # Local Streamlit runner
@@ -310,6 +326,8 @@ ai-search-journey-lab/
 │   ├── demo_ranking.py              # Deterministic ranking CLI demo
 │   ├── demo_static_map.py           # Maps preview CLI demo
 │   ├── demo_answer.py               # Grounded answer synthesis CLI demo
+│   ├── demo_visibility_v3.py        # V3 AI Visibility scan CLI demo
+│   ├── demo_visibility_agent_v4.py  # V4 AI Visibility Agent CLI demo
 │   └── demo_adk.py                  # End-to-end ADK agent CLI demo
 ├── src/ai_search_journey/           # Core library package
 │   ├── __init__.py                  # Package exports
@@ -324,15 +342,24 @@ ai-search-journey-lab/
 │   ├── constraints.py               # Deterministic constraint evaluation engine
 │   ├── ranking.py                   # Scoring and explainable ranking engine
 │   ├── static_map.py                # Google Maps Static API URL generator
-│   ├── answer.py                    # Grounded answer synthesis
-│   ├── app.py                       # Streamlit Journey Inspector application
+│   ├── answer.py                    # Grounded answer synthesis with resilience
+│   ├── app.py                       # Streamlit Journey Inspector application (4 tabs)
 │   ├── ui_assets.py                 # UI branding and logo helpers
 │   ├── ui_formatters.py             # UI table, badge, and timeline formatters
-│   └── adk/                         # Google ADK agent implementation
-│       ├── __init__.py
-│       ├── agent.py                 # SearchJourneyAgent root orchestrator
-│       └── tools.py                 # ADK tool wrappers
-├── tests/                           # Comprehensive test suite (140+ tests)
+│   ├── adk/                         # Google ADK agent implementation
+│   │   ├── __init__.py
+│   │   ├── agent.py                 # SearchJourneyAgent root orchestrator
+│   │   └── tools.py                 # ADK tool wrappers
+│   └── visibility/                  # V3/V4 AI Visibility engine & Agent
+│       ├── models.py                # Visibility schemas & brand metrics
+│       ├── extractor.py             # Signal extractor & Gemini grounding
+│       ├── metrics.py               # Share of Voice & visibility calculator
+│       ├── repository.py            # BigQuery persistence & schema manager
+│       ├── mcp_server.py            # Read-only MCP analytical tools
+│       ├── agent.py                 # V4 ADK conversational agent
+│       ├── ui.py                    # V3 AI Visibility Streamlit tab
+│       └── ui_v4.py                 # V4 AI Visibility Agent Streamlit tab
+├── tests/                           # Comprehensive test suite (340+ tests)
 ├── Dockerfile                       # Production multi-stage Dockerfile
 ├── .dockerignore                    # Build context exclusions
 ├── pyproject.toml                   # Project dependencies and tool configurations
@@ -352,7 +379,7 @@ ai-search-journey-lab/
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/hastimal/ai-search-journey-lab.git
+git clone https://github.com/hastimal.jangid/ai-search-journey-lab.git
 cd ai-search-journey-lab
 
 # 2. Create and activate virtual environment
@@ -360,7 +387,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 # 3. Install package and development dependencies
-pip install -e ".[dev]"
+pip install -e ".[bigquery,v4-agent,dev]"
 
 # 4. Configure environment variables
 cp .env.example .env
@@ -369,7 +396,8 @@ cp .env.example .env
 Edit `.env`:
 ```env
 GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
-GEMINI_MODEL="gemini-2.5-flash"
+GEMINI_MODEL="gemini-3.6-flash"
+GEMINI_FALLBACK_MODEL="gemini-3.5-flash-lite"
 GOOGLE_MAPS_API_KEY="YOUR_GOOGLE_MAPS_API_KEY"
 LOG_LEVEL="INFO"
 ```
@@ -399,26 +427,70 @@ streamlit run src/ai_search_journey/app.py
 
 Access the UI at `http://localhost:8501`.
 
-### Application Architecture: Three Capability Tabs
+### Application Architecture: Four Capability Tabs
 
-The Journey Inspector organizes inspection and evaluation into three dedicated capability tabs:
+The Journey Inspector organizes inspection and evaluation into four dedicated capability tabs:
 
 ```text
-┌───────────────────────────┬───────────────────────────┬───────────────────────────┐
-│  Search to Decision [V1]  │   Journey Analysis [V2]   │    AI Visibility [V3]     │
-├───────────────────────────┼───────────────────────────┼───────────────────────────┤
-│ • Interactive AI search   │ • Multi-query candidate   │ • Brand presence & SOV    │
-│ • Grounded recommendations│   retrieval provenance    │ • Narrative mention rate  │
-│ • Constraint matrix       │ • Explainable rank        │ • Owned citation analysis │
-│ • Static map preview      │   movement (Δ) tracking   │ • Competitor benchmark    │
-│ • ADK execution trace     │ • Transparent score       │ • BigQuery or in-memory   │
-│                           │   decomposition           │   session history         │
-└───────────────────────────┴───────────────────────────┴───────────────────────────┘
+┌───────────────────────────┬───────────────────────────┬───────────────────────────┬───────────────────────────┐
+│  Search to Decision [V1]  │   Journey Analysis [V2]   │    AI Visibility [V3]     │ AI Visibility Agent [V4]  │
+├───────────────────────────┼───────────────────────────┼───────────────────────────┼───────────────────────────┤
+│ • Interactive AI search   │ • Multi-query candidate   │ • Brand presence & SOV    │ • Conversational natural  │
+│ • Grounded recommendations│   retrieval provenance    │ • Narrative mention rate  │   language agent          │
+│ • Constraint matrix       │ • Explainable rank        │ • Owned citation analysis │ • Grounded in read-only   │
+│ • Static map preview      │   movement (Δ) tracking   │ • Competitor benchmark    │   BigQuery scan history   │
+│ • ADK execution trace     │ • Transparent score       │ • BigQuery or in-memory   │ • ADK + local MCP tools   │
+│                           │   decomposition           │   session history         │ • Discovery-first answers │
+└───────────────────────────┴───────────────────────────┴───────────────────────────┴───────────────────────────┘
 ```
 
 - **Search to Decision [V1]:** End-to-end user-facing search journey from question to grounded recommendations, constraint validation, static map rendering, and live developer execution traces.
 - **Journey Analysis [V2]:** Deep-dive provenance tracking, transparent score breakdowns (hard points, preferences, proximity, penalties), and deterministic rank movement explanations ($\Delta$).
 - **AI Visibility [V3]:** Reuses completed search journeys to quantify brand presence, narrative mention rates, recommendation rates, owned citation rates, and share of voice against competitors.
+- **AI Visibility Agent [V4]:** Natural language agent grounded in persisted BigQuery visibility scans, answering strategic questions via read-only Model Context Protocol (MCP) analytics tools.
+
+---
+
+### AI Visibility Agent [V4] (Read-Only Conversational Agent)
+
+The **V4 AI Visibility Agent** provides a natural language conversational interface over persisted V3 BigQuery visibility history.
+
+> [!IMPORTANT]
+> **Strict Read-Only Architecture:**
+> - V4 is an **AI Visibility Agent**, not a new scan engine. It strictly queries historical data already persisted by V3 scans in BigQuery.
+> - **No write operations:** V4 never writes to BigQuery, inserts records, or triggers new V1/V3 live scans.
+> - **Isolated execution:** Uses parameterized BigQuery queries without dynamic SQL generation.
+
+#### Architecture Flow
+
+```mermaid
+flowchart TD
+    User([Streamlit UI Composer]) -->|Natural language question| Agent[Gemini / Google ADK Agent]
+    Agent -->|Stdio JSON-RPC tool calls| MCP[Local MCP Server]
+    MCP -->|Parameterized SQL| BQ[(BigQuery V3 History)]
+    BQ -.->|Historical metrics & scan bounds| MCP
+    MCP -.->|Structured tool results| Agent
+    Agent -->|Grounded conversational answer| User
+
+    subgraph Boundaries ["Strict Operational Boundaries"]
+        style Boundaries fill:#1e293b,stroke:#dc2626,stroke-width:1px,stroke-dasharray: 5 5
+        B1["🔒 Read-Only Analytics (No writes to BigQuery)"]
+        B2["🚫 Isolated from V1/V3 (Cannot trigger live scans)"]
+    end
+```
+
+#### Grounding & Discovery Behavior
+- **Discovery-First Grounding:** Before analyzing broad questions (e.g. asking about "available history", "latest trends", or when a brand/date range is omitted), the agent calls `get_available_history` to discover actual scan counts, earliest/latest scan timestamps, and real persisted `brand_id` values. It never invents placeholder brands (e.g. default "nike") or arbitrary date ranges.
+- **Brand Scope:** Broad history prompts compare across available discovered brands; brand-specific queries should reference real persisted `brand_id` identifiers.
+- **Trend Inferences:** Trend analysis strictly requires multiple distinct scan dates. Multiple scans executed on a single day provide window comparisons but do not imply a chronological trend.
+
+#### Try V4: Example Prompts
+You can query the V4 agent using natural questions such as:
+- `Give me a visibility summary for the available history. Use the most recent available scan window.`
+- `What should I do for better ranking compared to my competitors?`
+- `Analyze citations for pullman_coffee using the most recent available scan window.`
+
+*(Note: Brand IDs like `pullman_coffee` must exist in your persisted BigQuery visibility history to return brand-specific metrics).*
 
 ---
 

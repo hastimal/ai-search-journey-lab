@@ -7,10 +7,12 @@ from typing import Any, Literal, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from ai_search_journey.visibility.bigquery_repository import BigQueryDependencyError
 from ai_search_journey.visibility.bigquery_schema import (
     TABLE_BRAND_OBSERVATIONS,
     TABLE_CITATIONS,
     TABLE_FANOUT_OBSERVATIONS,
+    TABLE_VISIBILITY_SCANS,
     validate_dataset_id,
     validate_location,
     validate_project_id,
@@ -29,10 +31,6 @@ except ImportError:
 
 class AnalyticsValidationError(ValueError):
     """Raised when an analytics request fails validation."""
-
-
-class BigQueryDependencyError(ImportError):
-    """Raised when BigQuery optional dependencies are not installed."""
 
 
 class AnalyticsDatabaseError(Exception):
@@ -181,6 +179,26 @@ class FanoutGapResult(BaseModel):
     gaps: list[FanoutGapDataPoint]
 
 
+class ScanMetadata(BaseModel):
+    scan_id: str
+    started_at: str  # ISO 8601 string
+    brand_id: str
+    brand_name_snapshot: str
+    prompt_text_snapshot: str
+
+
+class AvailableHistoryRequest(BaseModel):
+    lookback_days: int = Field(default=365, ge=1, le=365)
+
+
+class AvailableHistoryResult(BaseModel):
+    earliest_started_at: str | None
+    latest_started_at: str | None
+    total_scans: int
+    distinct_brand_ids: list[str]
+    recent_scans: list[ScanMetadata]
+
+
 # ======================================================================
 # Interfaces
 # ======================================================================
@@ -189,6 +207,10 @@ class FanoutGapResult(BaseModel):
 @runtime_checkable
 class VisibilityAnalyticsRepository(Protocol):
     """Read-only interface for analyzing historical V3 AI Visibility scans."""
+
+    def get_available_history(
+        self, request: AvailableHistoryRequest
+    ) -> AvailableHistoryResult: ...
 
     def get_visibility_summary(
         self, request: VisibilitySummaryRequest
@@ -243,6 +265,67 @@ class BigQueryVisibilityAnalyticsRepository:
             return list(job.result())
         except Exception as e:
             raise AnalyticsDatabaseError(f"Failed to execute query: {e}") from e
+
+    def get_available_history(self, request: AvailableHistoryRequest) -> AvailableHistoryResult:
+        summary_sql = f"""
+        SELECT
+            CAST(MIN(started_at) AS STRING) AS earliest_started_at,
+            CAST(MAX(started_at) AS STRING) AS latest_started_at,
+            COUNT(DISTINCT scan_id) AS total_scans,
+            ARRAY_AGG(DISTINCT brand_id IGNORE NULLS) AS distinct_brand_ids
+        FROM `{self.project_id}.{self.dataset_id}.{TABLE_BRAND_OBSERVATIONS}`
+        WHERE started_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @lookback_days DAY)
+        """
+        summary_params = [
+            bigquery.ScalarQueryParameter("lookback_days", "INT64", request.lookback_days),
+        ]
+        summary_rows = self._execute_query(summary_sql, summary_params)
+
+        recent_sql = f"""
+        SELECT
+            scan_id,
+            CAST(started_at AS STRING) AS started_at,
+            brand_id,
+            brand_name_snapshot,
+            prompt_text_snapshot
+        FROM `{self.project_id}.{self.dataset_id}.{TABLE_VISIBILITY_SCANS}`
+        WHERE started_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @lookback_days DAY)
+        ORDER BY started_at DESC
+        LIMIT 10
+        """
+        recent_params = [
+            bigquery.ScalarQueryParameter("lookback_days", "INT64", request.lookback_days),
+        ]
+        recent_rows = self._execute_query(recent_sql, recent_params)
+
+        recent_scans = [
+            ScanMetadata(
+                scan_id=row.get("scan_id") or "",
+                started_at=row.get("started_at") or "",
+                brand_id=row.get("brand_id") or "",
+                brand_name_snapshot=row.get("brand_name_snapshot") or "",
+                prompt_text_snapshot=row.get("prompt_text_snapshot") or "",
+            )
+            for row in recent_rows
+        ]
+
+        if not summary_rows:
+            return AvailableHistoryResult(
+                earliest_started_at=None,
+                latest_started_at=None,
+                total_scans=0,
+                distinct_brand_ids=[],
+                recent_scans=recent_scans,
+            )
+
+        row = summary_rows[0]
+        return AvailableHistoryResult(
+            earliest_started_at=row.get("earliest_started_at"),
+            latest_started_at=row.get("latest_started_at"),
+            total_scans=int(row.get("total_scans") or 0),
+            distinct_brand_ids=list(row.get("distinct_brand_ids") or []),
+            recent_scans=recent_scans,
+        )
 
     def get_visibility_summary(self, request: VisibilitySummaryRequest) -> VisibilitySummaryResult:
         sql = f"""

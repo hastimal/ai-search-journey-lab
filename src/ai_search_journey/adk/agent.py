@@ -27,6 +27,7 @@ from ai_search_journey.evidence import aggregate_evidence
 from ai_search_journey.fanout import generate_fanout
 from ai_search_journey.models import (
     Candidate,
+    GroundedAnswer,
     JourneyExecutionTrace,
     JourneyResult,
     JourneyStepTiming,
@@ -404,12 +405,14 @@ class SearchJourneyAgent:
         step_ans.status = StepExecutionStatus.RUNNING
         notify_step(step_ans)
         t0 = time.perf_counter()
+        grounded_answer: Optional[GroundedAnswer] = None
         try:
             grounded_answer = await generate_grounded_answer(
                 question=question,
                 intent=intent,
                 ranked_candidates=top_candidates,
                 max_candidates=3,
+                on_trace=trace,
             )
             step_ans.duration_seconds = round(max(0.0, time.perf_counter() - t0), 3)
             step_ans.status = StepExecutionStatus.COMPLETED
@@ -420,9 +423,10 @@ class SearchJourneyAgent:
             step_ans.duration_seconds = round(max(0.0, time.perf_counter() - t0), 3)
             step_ans.status = StepExecutionStatus.FAILED
             step_ans.error = str(e)
+            step_ans.detail = "Grounded answer unavailable"
             execution_trace.failed_step_key = "answer"
             notify_step(step_ans)
-            raise
+            trace(f"Grounded answer generation unavailable: {e}")
 
         # Finalize execution trace
         total_duration = round(max(0.0, time.perf_counter() - overall_start_time), 3)

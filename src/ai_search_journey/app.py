@@ -34,6 +34,7 @@ from ai_search_journey.ui_formatters import (
     render_execution_timeline,
 )
 from ai_search_journey.visibility.ui import render_visibility_tab
+from ai_search_journey.visibility.ui_v4 import render_visibility_agent_tab
 
 DEFAULT_COFFEE_QUERY = (
     "Find a coffee shop near Geekdom San Antonio for 6 people "
@@ -134,10 +135,11 @@ def render_app() -> None:
 
     journey = st.session_state.journey_result
     if not journey:
-        tab_v1, tab_v2, tab_v3 = st.tabs([
+        tab_v1, tab_v2, tab_v3, tab_v4 = st.tabs([
             "Search to Decision [V1]",
             "Journey Analysis [V2]",
             "AI Visibility [V3]",
+            "AI Visibility Agent [V4]",
         ])
         with tab_v1:
             render_journey_hint()
@@ -145,17 +147,20 @@ def render_app() -> None:
             render_journey_hint()
         with tab_v3:
             render_visibility_tab(None)
+        with tab_v4:
+            render_visibility_agent_tab()
         return
 
     # 3. Search Journey Complete Collapsible Expander (Default collapsed)
     if journey.execution_trace:
         render_execution_timeline(journey.execution_trace, journey=journey)
 
-    # Capability Tabs: V1 (Search to Decision), V2 (Journey Analysis), V3 (AI Visibility)
-    tab_v1, tab_v2, tab_v3 = st.tabs([
+    # Capability Tabs: V1 (Search to Decision), V2 (Journey Analysis), V3 (AI Visibility), V4
+    tab_v1, tab_v2, tab_v3, tab_v4 = st.tabs([
         "Search to Decision [V1]",
         "Journey Analysis [V2]",
         "AI Visibility [V3]",
+        "AI Visibility Agent [V4]",
     ])
 
     # ==================================================================
@@ -208,6 +213,12 @@ def render_app() -> None:
                         st.write("**Caveats & Disclaimers:**")
                         for c in journey.answer.caveats:
                             st.caption(f"⚠️ {c}")
+                else:
+                    st.warning(
+                        "⚠️ Final grounded answer is currently unavailable. "
+                        "Deterministic candidate rankings, constraint evaluation, "
+                        "and map preview remain fully available."
+                    )
 
             # RIGHT COLUMN: Top 3 Cards & Parsed Intent
             with col_right:
@@ -532,6 +543,11 @@ def render_app() -> None:
     with tab_v3:
         render_visibility_tab(journey)
 
+    # ==================================================================
+    # TAB 4: AI Visibility Agent [V4]
+    # ==================================================================
+    with tab_v4:
+        render_visibility_agent_tab()
 
 if __name__ == "__main__":
     render_app()
