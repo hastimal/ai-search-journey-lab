@@ -14,6 +14,11 @@ SERVICE="${SERVICE:-ai-search-journey-lab}"
 IMAGE_NAME="${IMAGE_NAME:-ai-search-journey-lab}"
 SERVICE_ACCOUNT_NAME="${SERVICE_ACCOUNT_NAME:-ai-search-journey-runner}"
 
+BIGQUERY_PROJECT="${BIGQUERY_PROJECT:-ai-search-journey-lab}"
+BIGQUERY_DATASET="${BIGQUERY_DATASET:-ai_search_journey_v3}"
+BIGQUERY_LOCATION="${BIGQUERY_LOCATION:-US}"
+GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.6-flash}"
+
 # 1. Verify required CLI tools
 command -v gcloud >/dev/null 2>&1 || { echo "❌ ERROR: gcloud CLI is required but not installed."; exit 1; }
 command -v docker >/dev/null 2>&1 || { echo "❌ ERROR: docker is required but not installed."; exit 1; }
@@ -64,6 +69,7 @@ gcloud run deploy "${SERVICE}" \
   --cpu=2 \
   --timeout=300 \
   --service-account="${SA_EMAIL}" \
+  --set-env-vars="BIGQUERY_PROJECT=${BIGQUERY_PROJECT},BIGQUERY_DATASET=${BIGQUERY_DATASET},BIGQUERY_LOCATION=${BIGQUERY_LOCATION},GEMINI_MODEL=${GEMINI_MODEL}" \
   --set-secrets="GEMINI_API_KEY=gemini-api-key:latest,GOOGLE_MAPS_API_KEY=google-maps-api-key:latest" \
   --allow-unauthenticated \
   --quiet
