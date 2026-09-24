@@ -44,7 +44,7 @@ def test_missing_bigquery_settings_disables_chat(monkeypatch: pytest.MonkeyPatch
     # Missing dataset
     monkeypatch.setattr("ai_search_journey.config.settings.bigquery_project", "valid-project")
     monkeypatch.setattr(
-        "ai_search_journey.config.settings.bigquery_dataset", "ai_search_journey_v3"
+        "ai_search_journey.config.settings.bigquery_dataset", ""
     )
     is_ready, msg = check_readiness()
     assert not is_ready

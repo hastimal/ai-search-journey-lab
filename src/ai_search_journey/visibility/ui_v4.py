@@ -20,7 +20,7 @@ def check_readiness() -> tuple[bool, str]:
     if not settings.bigquery_project or settings.bigquery_project == "your-gcp-project":
         return False, "⚠️ BigQuery `BIGQUERY_PROJECT` is not configured in `.env`."
         
-    if not settings.bigquery_dataset or settings.bigquery_dataset == "ai_search_journey_v3":
+    if not settings.bigquery_dataset:
         return False, "⚠️ BigQuery `BIGQUERY_DATASET` is not configured in `.env`."
 
     if not settings.bigquery_location:
