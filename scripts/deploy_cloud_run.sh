@@ -70,9 +70,8 @@ if [[ "${CONFIGURE_BIGQUERY_IAM}" == "true" ]]; then
     --role="roles/bigquery.jobUser" \
     --quiet
 
-  echo "  - Granting dataset-level roles/bigquery.dataEditor on ${PROJECT_ID}:${BIGQUERY_DATASET}..."
-  gcloud alpha bq datasets add-iam-policy-binding "${BIGQUERY_DATASET}" \
-    --project="${PROJECT_ID}" \
+  echo "  - Granting project-level roles/bigquery.dataEditor..."
+  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
     --member="serviceAccount:${SA_EMAIL}" \
     --role="roles/bigquery.dataEditor" \
     --quiet
