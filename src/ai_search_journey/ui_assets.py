@@ -215,18 +215,37 @@ def render_app_title(
             background: none !important;
             -webkit-text-fill-color: #DADCE0 !important;
         }}
-        /* Primary Capability Tabs: Top-level stTabs navigation */
+
+        /* Run Search Journey primary button typography enhancement */
+        button[data-testid="stBaseButton-primary"],
+        button[kind="primary"] {{
+            font-size: 1.02rem !important;
+            font-weight: 600 !important;
+            letter-spacing: -0.005em !important;
+            height: 44px !important;
+        }}
+
+        button[data-testid="stBaseButton-primary"] p,
+        button[kind="primary"] p {{
+            font-size: 1.02rem !important;
+            font-weight: 600 !important;
+        }}
+
+        /* Primary Capability Tabs: Top-level stTabs sequence navigation */
         div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
             [role="tablist"] {{
             display: flex !important;
             flex-direction: row !important;
-            gap: 8px !important;
+            align-items: center !important;
+            gap: 12px !important;
             border-bottom: none !important;
-            padding: 4px !important;
-            background: rgba(15, 23, 42, 0.6) !important;
-            border: 1px solid rgba(255, 255, 255, 0.08) !important;
-            border-radius: 10px !important;
-            margin-bottom: 16px !important;
+            padding: 8px 12px !important;
+            background: rgba(15, 23, 42, 0.75) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-radius: 12px !important;
+            margin-bottom: 22px !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05),
+                0 4px 16px rgba(0, 0, 0, 0.3) !important;
         }}
 
         /* Primary Tab items */
@@ -234,42 +253,68 @@ def render_app_title(
             [role="tablist"] > div[data-testid="stTab"] {{
             flex: 1 1 0 !important;
             min-width: 0 !important;
-            height: 44px !important;
+            height: 48px !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
             text-align: center !important;
             border-radius: 8px !important;
-            padding: 0 12px !important;
+            padding: 0 10px !important;
             background-color: rgba(255, 255, 255, 0.04) !important;
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
-            color: #ffffff !important;
+            color: rgba(255, 255, 255, 0.85) !important;
             font-weight: 600;
-            font-size: 0.90rem;
+            font-size: 0.95rem;
             cursor: pointer !important;
-            transition: all 0.2s ease-in-out !important;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
             box-sizing: border-box !important;
+            position: relative !important;
+        }}
+
+        /* Prominent progression arrow between primary stages (omitted after last stage) */
+        div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+            [role="tablist"] > div[data-testid="stTab"]:not(:last-child)::after {{
+            content: "→" !important;
+            position: absolute !important;
+            right: -14px !important;
+            font-size: 1.15rem !important;
+            font-weight: 600 !important;
+            line-height: 1 !important;
+            color: rgba(255, 255, 255, 0.45) !important;
+            pointer-events: none !important;
+            z-index: 2 !important;
+            user-select: none !important;
         }}
 
         div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
             [role="tablist"] > div[data-testid="stTab"] p,
         div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
             [role="tablist"] > div[data-testid="stTab"] div[data-testid="stMarkdownContainer"] p {{
-            color: #ffffff !important;
+            color: rgba(255, 255, 255, 0.85) !important;
             margin: 0 !important;
             padding: 0 !important;
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
-            font-size: 0.90rem;
+            font-size: 0.95rem;
             font-weight: 600;
+            transition: color 0.15s ease !important;
         }}
 
         /* Primary Tab hover */
         div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
             [role="tablist"] > div[data-testid="stTab"]:hover {{
             background-color: rgba(255, 255, 255, 0.09) !important;
-            border-color: rgba(255, 255, 255, 0.2) !important;
+            border-color: rgba(255, 255, 255, 0.25) !important;
+            color: #ffffff !important;
+            transform: translateY(-1px) !important;
+        }}
+
+        div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+            [role="tablist"] > div[data-testid="stTab"]:hover p,
+        div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+            [role="tablist"] > div[data-testid="stTab"]:hover
+            div[data-testid="stMarkdownContainer"] p {{
             color: #ffffff !important;
         }}
 
@@ -279,8 +324,17 @@ def render_app_title(
             background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
             border: 1px solid #ef4444 !important;
             color: #ffffff !important;
-            box-shadow: 0 0 14px rgba(220, 38, 38, 0.35),
-                inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+            box-shadow: 0 0 16px rgba(220, 38, 38, 0.45),
+                inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+        }}
+
+        div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+            [role="tablist"] > div[data-testid="stTab"][aria-selected="true"] p,
+        div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+            [role="tablist"] > div[data-testid="stTab"][aria-selected="true"]
+            div[data-testid="stMarkdownContainer"] p {{
+            color: #ffffff !important;
+            font-weight: 700 !important;
         }}
 
         /* Primary Tab focus ring for keyboard accessibility */
@@ -296,30 +350,48 @@ def render_app_title(
             display: none !important;
         }}
 
-        /* Secondary Tabs (e.g. V1 Journey Layers sub-tabs inside stTabPanel) */
+        /* V1 Workspace Contextual Label */
+        .v1-workspace-header {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.74rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(255, 255, 255, 0.55);
+            margin-top: 4px;
+            margin-bottom: 8px;
+            user-select: none;
+            padding-left: 2px;
+        }}
+
+        /* Secondary Tabs (V1 Workspace Sub-Navigation: compact segmented pills) */
         div[data-testid="stTabPanel"] div[data-testid="stTabs"] [role="tablist"] {{
-            display: flex !important;
+            display: inline-flex !important;
             flex-wrap: wrap !important;
+            align-items: center !important;
             gap: 6px !important;
-            background: rgba(15, 23, 42, 0.4) !important;
-            border: 1px solid rgba(255, 255, 255, 0.05) !important;
+            background: rgba(255, 255, 255, 0.03) !important;
+            border: 1px solid rgba(255, 255, 255, 0.07) !important;
             border-radius: 8px !important;
-            padding: 4px !important;
-            margin-top: 4px !important;
-            margin-bottom: 14px !important;
-            border-bottom: none !important;
+            padding: 4px 6px !important;
+            margin-top: 0 !important;
+            margin-bottom: 20px !important;
+            box-shadow: none !important;
         }}
 
         div[data-testid="stTabPanel"] div[data-testid="stTabs"]
             [role="tablist"] > div[data-testid="stTab"] {{
-            height: 36px !important;
-            padding: 0 12px !important;
-            border-radius: 6px !important;
+            flex: 0 0 auto !important;
+            height: 28px !important;
+            padding: 0 10px !important;
+            border-radius: 5px !important;
             background-color: transparent !important;
             border: 1px solid transparent !important;
-            color: rgba(255, 255, 255, 0.7) !important;
-            font-size: 0.85rem;
-            font-weight: 500;
+            color: rgba(255, 255, 255, 0.65) !important;
+            font-size: 0.80rem !important;
+            font-weight: 500 !important;
             display: inline-flex !important;
             align-items: center !important;
             justify-content: center !important;
@@ -330,16 +402,16 @@ def render_app_title(
             [role="tablist"] > div[data-testid="stTab"] p,
         div[data-testid="stTabPanel"] div[data-testid="stTabs"]
             [role="tablist"] > div[data-testid="stTab"] div[data-testid="stMarkdownContainer"] p {{
-            color: rgba(255, 255, 255, 0.7) !important;
+            color: rgba(255, 255, 255, 0.65) !important;
             margin: 0 !important;
             padding: 0 !important;
-            font-size: 0.85rem;
-            font-weight: 500;
+            font-size: 0.80rem !important;
+            font-weight: 500 !important;
         }}
 
         div[data-testid="stTabPanel"] div[data-testid="stTabs"]
             [role="tablist"] > div[data-testid="stTab"]:hover {{
-            background-color: rgba(255, 255, 255, 0.05) !important;
+            background-color: rgba(255, 255, 255, 0.06) !important;
             border-color: rgba(255, 255, 255, 0.1) !important;
             color: #ffffff !important;
         }}
@@ -352,13 +424,14 @@ def render_app_title(
             color: #ffffff !important;
         }}
 
-        /* Secondary active tab: restrained red underline / pill */
+        /* Secondary active tab: pill with red left accent & bright text */
         div[data-testid="stTabPanel"] div[data-testid="stTabs"]
             [role="tablist"] > div[data-testid="stTab"][aria-selected="true"] {{
-            background-color: rgba(220, 38, 38, 0.15) !important;
+            background: rgba(220, 38, 38, 0.15) !important;
             border: 1px solid rgba(239, 68, 68, 0.4) !important;
-            border-bottom: 2px solid #ef4444 !important;
+            border-left: 3px solid #ef4444 !important;
             color: #ffffff !important;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2) !important;
         }}
 
         div[data-testid="stTabPanel"] div[data-testid="stTabs"]
@@ -386,20 +459,25 @@ def render_app_title(
             div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
                 [role="tablist"] {{
                 flex-wrap: wrap !important;
+                gap: 8px !important;
             }}
             div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
                 [role="tablist"] > div[data-testid="stTab"] {{
-                flex: 1 1 calc(50% - 8px) !important;
-                min-width: 140px !important;
-                height: 40px !important;
-                font-size: 0.82rem !important;
+                flex: 1 1 calc(50% - 10px) !important;
+                min-width: 130px !important;
+                height: 38px !important;
+                font-size: 0.80rem !important;
+            }}
+            div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
+                [role="tablist"] > div[data-testid="stTab"]:not(:last-child)::after {{
+                display: none !important;
             }}
             div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
                 [role="tablist"] > div[data-testid="stTab"] p,
             div[data-testid="stTabs"]:not([data-testid="stTabPanel"] div[data-testid="stTabs"])
                 [role="tablist"] > div[data-testid="stTab"]
                 div[data-testid="stMarkdownContainer"] p {{
-                font-size: 0.82rem !important;
+                font-size: 0.80rem !important;
             }}
         }}
 

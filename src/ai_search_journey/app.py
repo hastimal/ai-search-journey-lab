@@ -175,6 +175,11 @@ def render_app() -> None:
     # TAB 1: Search to Decision [V1] (Preserves v1.0.0 Interface Exactly)
     # ==================================================================
     with tab_v1:
+        # Contextual label differentiating V1 secondary workspace from capability tabs
+        st.markdown(
+            '<div class="v1-workspace-header">🧭 Explore this search journey</div>',
+            unsafe_allow_html=True,
+        )
         tab_overview, tab_fanout, tab_matrix, tab_evidence, tab_trace = st.tabs([
             "🎯 Recommendations & Intent",
             "🔀 Planner Query Fan-Out",
