@@ -87,7 +87,7 @@ def render_app() -> None:
             placeholder="Enter a local search question with constraints...",
         )
 
-    run_clicked = st.button("🚀 Run Search Journey", type="primary", use_container_width=True)
+    run_clicked = st.button("🚀 Run Search Journey", type="primary", width="stretch")
 
     # Session State management
     if "journey_result" not in st.session_state:
@@ -195,7 +195,7 @@ def render_app() -> None:
                     st.image(
                         journey.static_map.url,
                         caption=f"Google Maps Static API Preview ({marker_cnt} markers: A, B, C)",
-                        use_container_width=True,
+                        width="stretch",
                     )
                 else:
                     st.info("No static map available for the ranked results.")
@@ -354,7 +354,7 @@ def render_app() -> None:
 
             headers, matrix_rows = build_constraint_matrix_data(journey)
             if matrix_rows:
-                st.dataframe(matrix_rows, use_container_width=True, hide_index=True)
+                st.dataframe(matrix_rows, width="stretch", hide_index=True)
 
             st.subheader("🔍 Constraint Evidence Inspector")
             if journey.constraint_result:
@@ -475,7 +475,7 @@ def render_app() -> None:
                 "Final Score": f"{cand_ranked.score:.2f}",
             })
         if journey_summary_rows:
-            st.dataframe(journey_summary_rows, use_container_width=True, hide_index=True)
+            st.dataframe(journey_summary_rows, width="stretch", hide_index=True)
 
         st.divider()
 
@@ -493,7 +493,7 @@ def render_app() -> None:
                     "Source Name": occ.source_name,
                 })
         if provenance_rows:
-            st.dataframe(provenance_rows, use_container_width=True, hide_index=True)
+            st.dataframe(provenance_rows, width="stretch", hide_index=True)
         else:
             st.info("No retrieval occurrences recorded.")
 

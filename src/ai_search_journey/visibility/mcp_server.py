@@ -112,16 +112,102 @@ def compare_brands(start_date: str, end_date: str, brand_ids: list[str]) -> dict
         "v4.mcp_tool.compare_brands",
         attributes={
             "mcp.tool_name": "compare_brands",
-            "mcp.brand_count": len(brand_ids),
+            "mcp.brand_count": len(brand_ids) if brand_ids else 0,
             "bigquery.read_only": True,
         },
-    ):
-        sd = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-        ed = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-        req = CompetitorComparisonRequest.model_validate({
-            "start_date": sd, "end_date": ed, "brand_ids": brand_ids
-        })
-        return get_repo().compare_brands(req).model_dump()
+    ) as s_span:
+        if not brand_ids or not isinstance(brand_ids, list):
+            return {
+                "error": "brand_ids must be a non-empty list of brand IDs",
+                "metrics": [],
+            }
+
+        # Deduplicate while preserving first-seen input order
+        seen: set[str] = set()
+        deduped_brand_ids: list[str] = []
+        for bid in brand_ids:
+            if isinstance(bid, str) and bid.strip():
+                clean_bid = bid.strip()
+                if clean_bid not in seen:
+                    seen.add(clean_bid)
+                    deduped_brand_ids.append(clean_bid)
+
+        if not deduped_brand_ids:
+            return {
+                "error": "No valid non-blank brand IDs provided",
+                "metrics": [],
+            }
+
+        if len(deduped_brand_ids) > 50:
+            return {
+                "error": (
+                    f"Too many brand IDs requested ({len(deduped_brand_ids)}). "
+                    "Maximum supported is 50."
+                ),
+                "metrics": [],
+            }
+
+        try:
+            sd = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            ed = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        except Exception as date_err:
+            return {
+                "error": f"Invalid ISO 8601 date format: {date_err}",
+                "metrics": [],
+            }
+
+        # If only 1 brand is provided, compare_brands requires at least 2 in repo schema.
+        # But for robustness, if 1 brand is passed, query it as a 1-item batch or summary.
+        # However, CompetitorComparisonRequest has min_length=2. To safely support 1 brand,
+        # duplicate it in the request or query get_visibility_summary and wrap in metrics.
+        # If >= 2 brands, batch in chunks of at most 10.
+        combined_metrics: list[dict[str, Any]] = []
+        repo_inst = get_repo()
+
+        if len(deduped_brand_ids) == 1:
+            try:
+                single_req = VisibilitySummaryRequest(
+                    start_date=sd, end_date=ed, brand_id=deduped_brand_ids[0]
+                )
+                single_res = repo_inst.get_visibility_summary(single_req)
+                combined_metrics.append(single_res.model_dump())
+            except Exception as e:
+                return {"error": f"Failed comparing single brand: {e}", "metrics": []}
+        else:
+            # Split into deterministic chunks of at most 10
+            chunk_size = 10
+            for i in range(0, len(deduped_brand_ids), chunk_size):
+                chunk = deduped_brand_ids[i:i + chunk_size]
+                # If a final remainder chunk has only 1 brand, we can pad with the first brand
+                # and filter out duplicates from the result
+                query_chunk = chunk
+                if len(chunk) == 1:
+                    query_chunk = [chunk[0], deduped_brand_ids[0]]
+
+                try:
+                    req = CompetitorComparisonRequest.model_validate({
+                        "start_date": sd, "end_date": ed, "brand_ids": query_chunk
+                    })
+                    chunk_res = repo_inst.compare_brands(req).model_dump()
+                    chunk_metrics = chunk_res.get("metrics", [])
+                    # Keep only metrics for the chunk
+                    chunk_brand_set = set(chunk)
+                    for m in chunk_metrics:
+                        bid = m.get("brand_id")
+                        if bid in chunk_brand_set and not any(
+                            existing.get("brand_id") == bid for existing in combined_metrics
+                        ):
+                            combined_metrics.append(m)
+                except Exception as batch_err:
+                    return {
+                        "error": f"Failed evaluating brand batch {chunk}: {batch_err}",
+                        "metrics": combined_metrics,
+                    }
+
+        if s_span.is_recording():
+            s_span.set_attribute("compare.result_count", len(combined_metrics))
+
+        return {"metrics": combined_metrics}
 
 @server.tool()
 def analyze_citations(

@@ -30,6 +30,9 @@ Strict Guidelines:
    Do not attempt to guess or hallucinate data.
 7. You must use ISO 8601 formats for dates when calling tools (e.g. 2026-09-24T00:00:00Z).
 8. Tool date ranges must not exceed 365 days.
+9. BROAD BRAND COMPARISONS: Broad discovered histories may contain more than 10 brands. Pass all
+   relevant discovered brand IDs to `compare_brands`; the comparison tool safely handles them in
+   batches under the hood. Do not invent subsets or arbitrarily omit discovered brands.
 """
 
 def create_v4_agent() -> Agent:
