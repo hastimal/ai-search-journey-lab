@@ -48,6 +48,11 @@ DEFAULT_INDIAN_QUERY = (
     "open after 9 PM, with vegetarian options."
 )
 
+DEFAULT_DENTIST_QUERY = (
+    "Find three pediatric dentists near the University of Houston "
+    "for a child anxious about dental visits."
+)
+
 
 def render_app() -> None:
     """Render the main Streamlit Search Journey Inspector application."""
@@ -69,13 +74,20 @@ def render_app() -> None:
     with col_preset:
         preset = st.selectbox(
             "Quick Demo Presets",
-            options=["Coffee Shop @ Geekdom", "Indian Restaurant @ Trinity", "Custom"],
+            options=[
+                "Coffee Shop @ Geekdom",
+                "Indian Restaurant @ Trinity",
+                "Pediatric Dentist @ UH",
+                "Custom",
+            ],
             index=0,
         )
 
     default_val = DEFAULT_COFFEE_QUERY
     if preset == "Indian Restaurant @ Trinity":
         default_val = DEFAULT_INDIAN_QUERY
+    elif preset == "Pediatric Dentist @ UH":
+        default_val = DEFAULT_DENTIST_QUERY
     elif preset == "Custom":
         default_val = ""
 
