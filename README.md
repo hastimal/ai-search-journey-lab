@@ -623,9 +623,16 @@ Contributions, feedback, and experiment ideas are welcome!
 - **GitHub:** [@hastimal](https://github.com/hastimal)
 - **LinkedIn:** [Hastimal Jangid](https://www.linkedin.com/in/hastimaljangid/)
 
+## 20. Contributors
+
+Contributions are welcome. Contributors are recognized through merged pull requests and the repository’s GitHub contributor graph.
+
+- [Harsh Jangid](https://github.com/harshjangid1015) — OpenTelemetry observability contribution (V5)
+
+See the full contributor history on [GitHub](https://github.com/hastimal/ai-search-journey-lab/graphs/contributors).
 ---
 
-## 20. Appendix: Full Journey Analysis Trace
+## 21. Appendix: Full Journey Analysis Trace
 
 <details>
 <summary><strong>🔍 Click to expand full-page Journey Analysis [V2] deep-dive trace</strong></summary>
@@ -637,6 +644,6 @@ Contributions, feedback, and experiment ideas are welcome!
 
 ---
 
-## 21. License
+## 22. License
 
 This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
