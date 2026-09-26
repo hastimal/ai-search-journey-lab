@@ -52,7 +52,8 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
     volumes:
       - ./observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./observability/grafana/provisioning/dashboards/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
+      - ./observability/grafana/provisioning/dashboards/ai_search_journey_dashboard.json:/var/lib/grafana/dashboards/ai_search_journey_dashboard.json:ro
     ports:
       - "3000:3000"   # Grafana UI
     depends_on:

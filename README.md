@@ -419,13 +419,18 @@ python -m mypy src
 
 ## 12. Running the Journey Inspector Locally
 
-Launch the Streamlit GUI:
+Launch the Streamlit GUI and local observability stack in one step:
 
+```bash
+python scripts/run_app_locally.py
+```
+
+*(This automatically starts the local Dockerized Observability stack, confirms Grafana/Prometheus/Tempo provisioning, and launches Streamlit at `http://localhost:8502` or `http://localhost:8501`).*
+
+Alternatively, launch standalone Streamlit in-memory without Docker:
 ```bash
 streamlit run src/ai_search_journey/app.py
 ```
-
-Access the UI at `http://localhost:8501`.
 
 ### Application Architecture: Five Capability Tabs
 
@@ -523,15 +528,23 @@ Telemetry is engineered with strict privacy boundaries:
 
 #### 5. Local Quick Start & URLs
 
-**Start the Observability Stack:**
+**Recommended (One-Step Launch):**
 ```bash
-docker compose -f docker-compose.observability.yml up -d
+python scripts/run_app_locally.py
 ```
+*(Starts the Docker observability stack, verifies Grafana provisioning, and starts Streamlit).*
 
-**Start the Application:**
+<details>
+<summary><strong>Advanced / Manual Two-Command Flow</strong></summary>
+
 ```bash
+# 1. Start Docker observability stack manually
+docker compose -f docker-compose.observability.yml up -d
+
+# 2. Start Streamlit app
 streamlit run src/ai_search_journey/app.py
 ```
+</details>
 
 **Local Endpoints:**
 | Service | URL | Purpose |
