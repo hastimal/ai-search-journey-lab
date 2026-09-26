@@ -238,7 +238,7 @@ def test_v3_visibility_scan_instrumentation(clean_telemetry_store: TelemetryStor
 
 
 def test_v4_agent_chat_instrumentation_and_read_only(clean_telemetry_store: TelemetryStore):
-    """Verify V4 agent chat wraps in v4.agent.chat_turn and enforces read-only boundary."""
+    """Verify V4 agent chat wraps in v4.agent.chat_turn with child spans."""
     mock_event = MagicMock()
     mock_event.text = "Based on BigQuery historical scans, the brand visibility is 80%."
 
@@ -252,11 +252,22 @@ def test_v4_agent_chat_instrumentation_and_read_only(clean_telemetry_store: Tele
     spans = clean_telemetry_store.get_all_spans()
     span_names = {s.name for s in spans}
     assert "v4.agent.chat_turn" in span_names
+    assert "v4.agent.load_context" in span_names
+    assert "v4.agent.gemini_generate" in span_names
+    assert "v4.agent.response" in span_names
 
     chat_span = next(s for s in spans if s.name == "v4.agent.chat_turn")
     assert chat_span.status == "OK"
     assert "v4.session_id" in chat_span.attributes
+    assert chat_span.attributes.get("workflow.stage") == "v4"
     assert chat_span.attributes.get("v4.response_length") == len(response)
+
+    # Ensure no raw prompts or sensitive text leaked into attributes
+    for s in spans:
+        for k, v in s.attributes.items():
+            assert "api_key" not in str(k).lower()
+            assert "prompt" not in str(k).lower()
+            assert "What is the latest" not in str(v)
 
 
 def test_v4_mcp_server_tools_have_read_only_attribute(clean_telemetry_store: TelemetryStore):
@@ -377,8 +388,14 @@ def test_v4_agent_chat_groups_as_single_run(clean_telemetry_store: TelemetryStor
     assert run["stage"] == "v4"
 
     spans = clean_telemetry_store.get_spans_for_run(run["run_id"])
-    assert len(spans) == 1
-    assert spans[0].name == "v4.agent.chat_turn"
+    assert len(spans) == 4
+    span_names = {s.name for s in spans}
+    assert span_names == {
+        "v4.agent.chat_turn",
+        "v4.agent.load_context",
+        "v4.agent.gemini_generate",
+        "v4.agent.response",
+    }
 
 
 def test_public_domain_models_have_no_telemetry_fields():

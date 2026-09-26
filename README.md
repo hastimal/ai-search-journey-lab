@@ -427,27 +427,135 @@ streamlit run src/ai_search_journey/app.py
 
 Access the UI at `http://localhost:8501`.
 
-### Application Architecture: Four Capability Tabs
+### Application Architecture: Five Capability Tabs
 
-The Journey Inspector organizes inspection and evaluation into four dedicated capability tabs:
+The Journey Inspector organizes inspection and evaluation into five dedicated capability tabs:
 
 ```text
-┌───────────────────────────┬───────────────────────────┬───────────────────────────┬───────────────────────────┐
-│  Search to Decision [V1]  │   Journey Analysis [V2]   │    AI Visibility [V3]     │ AI Visibility Agent [V4]  │
-├───────────────────────────┼───────────────────────────┼───────────────────────────┼───────────────────────────┤
-│ • Interactive AI search   │ • Multi-query candidate   │ • Brand presence & SOV    │ • Conversational natural  │
-│ • Grounded recommendations│   retrieval provenance    │ • Narrative mention rate  │   language agent          │
-│ • Constraint matrix       │ • Explainable rank        │ • Owned citation analysis │ • Grounded in read-only   │
-│ • Static map preview      │   movement (Δ) tracking   │ • Competitor benchmark    │   BigQuery scan history   │
-│ • ADK execution trace     │ • Transparent score       │ • BigQuery or in-memory   │ • ADK + local MCP tools   │
-│                           │   decomposition           │   session history         │ • Discovery-first answers │
-└───────────────────────────┴───────────────────────────┴───────────────────────────┴───────────────────────────┘
+┌───────────────────────────┬───────────────────────────┬───────────────────────────┬───────────────────────────┬───────────────────────────┐
+│  Search to Decision [V1]  │   Journey Analysis [V2]   │    AI Visibility [V3]     │ AI Visibility Agent [V4]  │    Observability [V5]     │
+├───────────────────────────┼───────────────────────────┼───────────────────────────┼───────────────────────────┼───────────────────────────┤
+│ • Interactive AI search   │ • Multi-query candidate   │ • Brand presence & SOV    │ • Conversational natural  │ • In-memory OpenTelemetry │
+│ • Grounded recommendations│   retrieval provenance    │ • Narrative mention rate  │   language agent          │   trace execution trees   │
+│ • Constraint matrix       │ • Explainable rank        │ • Owned citation analysis │ • Grounded in read-only   │ • Step latency breakdowns │
+│ • Static map preview      │   movement (Δ) tracking   │ • Competitor benchmark    │   BigQuery scan history   │ • Zero-leak redaction     │
+│ • ADK execution trace     │ • Transparent score       │ • BigQuery or in-memory   │ • ADK + local MCP tools   │ • Optional local Grafana, │
+│                           │   decomposition           │   session history         │ • Discovery-first answers │   Prometheus & Tempo stack│
+└───────────────────────────┴───────────────────────────┴───────────────────────────┴───────────────────────────┴───────────────────────────┘
 ```
 
 - **Search to Decision [V1]:** End-to-end user-facing search journey from question to grounded recommendations, constraint validation, static map rendering, and live developer execution traces.
 - **Journey Analysis [V2]:** Deep-dive provenance tracking, transparent score breakdowns (hard points, preferences, proximity, penalties), and deterministic rank movement explanations ($\Delta$).
 - **AI Visibility [V3]:** Reuses completed search journeys to quantify brand presence, narrative mention rates, recommendation rates, owned citation rates, and share of voice against competitors.
 - **AI Visibility Agent [V4]:** Natural language agent grounded in persisted BigQuery visibility scans, answering strategic questions via read-only Model Context Protocol (MCP) analytics tools.
+- **Observability [V5]:** Process-local, zero-external-dependency OpenTelemetry tracing and inspection with bounded in-memory storage, timeline visualizer, and optional local Dockerized Grafana stack.
+
+---
+
+### Observability [V5] & Local AgentOps Stack (Bonus-B)
+
+AI Search Journey Lab provides comprehensive, **local-first OpenTelemetry observability** across all V1–V4 search and agent workflows.
+
+#### Architecture
+
+```text
+Streamlit / V1 / V3 / V4 Workflows
+              │
+              ▼
+     OpenTelemetry (In-Memory + OTLP)
+              │
+              ▼
+     OTel Collector (Port 4318)
+          /        \
+         v          v
+      Tempo      Prometheus
+      (Port 3200) (Port 9090)
+         \          /
+          \        /
+              v
+           Grafana
+         (Port 3000)
+```
+
+- **Local In-Process Telemetry:** Always active by default. Traces, span hierarchies, and timing breakdowns are buffered in a bounded in-memory FIFO store and immediately inspectable in the **Observability [V5]** tab without any external servers or Docker containers required.
+- **Optional Local Dockerized Stack:** When enabled, traces and metrics are exported via standard OTLP JSON to an OpenTelemetry Collector, which routes traces to **Grafana Tempo** and exposes metrics to **Prometheus**, visualizable inside an auto-provisioned **Grafana AgentOps Dashboard**.
+
+#### 1. In-App Observability [V5] UI
+
+The **Observability [V5]** tab provides deep runtime inspection directly within Streamlit:
+- **Workflow Filtering:** Filter executions by stage (`All Stages`, `V1 Search Journey`, `V3 Visibility Scan`, `V4 Agent Chat`).
+- **Execution Run Selector:** Cleanly isolated selector to switch between execution runs with automatic state reset.
+- **Run Timeline & Metrics:** Total duration (ms), span count, and execution status (`OK` / `ERROR`).
+- **Span Execution Trace:** Hierarchical tree with microsecond timing, status badges, sanitized attributes, and error capture.
+- **AgentOps Navigation:** Direct action buttons to open the local Grafana Dashboard and Tempo Explore.
+
+![V5 OpenTelemetry Observability](assets/screenshots/v5_ai_visibility_opentelemetry.png)
+*Figure: In-app Observability [V5] tab showing OpenTelemetry execution timeline, span hierarchy, and status metrics.*
+
+#### 2. Grafana AgentOps Dashboard & Metrics
+
+The provisioned Grafana dashboard (`AI Search Journey — Observability Overview`) correlates metrics, throughput, latency, and distributed traces:
+- **Observed Execution Counts:** Counter increase cards for `V1 Journey Executions`, `V3 Visibility Scans`, `V4 Agent Chat Turns`, and `Workflow Failures` over the selected Grafana time window.
+- **Throughput by Stage:** Live request rate graph (`req/s`) partitioned by workflow stage (`v1`, `v3`, `v4`).
+- **Average Duration by Stage:** Moving latency averages calculated from duration sums and counts.
+- **V4 AgentOps Trace Table:** Dedicated TraceQL panel filtered to `workflow.stage = v4` with deep links into Tempo waterfalls.
+
+![V5 Grafana AgentOps Observability](assets/screenshots/v5_ai_visibility_grafana_observability.png)
+*Figure: Auto-provisioned Grafana AgentOps dashboard correlating Prometheus metrics, stage throughput, and Tempo traces.*
+
+#### 3. V4 AgentOps Trace Hierarchy
+
+V4 Visibility Agent chat interactions emit structured span hierarchies where model reasoning and tool invocation latencies are accurately measured:
+
+```text
+v4.agent.chat_turn
+├── v4.agent.load_context      (Context preparation & session loading)
+├── v4.agent.gemini_generate   (Model reasoning, token generation & MCP tool calls)
+└── v4.agent.response          (Response formatting & presentation)
+```
+
+#### 4. Privacy & Telemetry Guard
+
+Telemetry is engineered with strict privacy boundaries:
+- **Local Telemetry & Privacy Guard:** Raw prompts, credentials, user inputs, and sensitive content are never exported as telemetry attributes or metric labels.
+- **Zero Sensitive Metric Labels:** Prometheus metric labels maintain low cardinality (`stage="v1|v3|v4"`, `status="ok|error"`) and strictly exclude trace IDs, session IDs, and user text.
+- **Local-Only:** Telemetry is buffered in-process and only sent to the local Dockerized OpenTelemetry collector when configured; no external SaaS or third-party monitoring services are contacted.
+
+#### 5. Local Quick Start & URLs
+
+**Start the Observability Stack:**
+```bash
+docker compose -f docker-compose.observability.yml up -d
+```
+
+**Start the Application:**
+```bash
+streamlit run src/ai_search_journey/app.py
+```
+
+**Local Endpoints:**
+| Service | URL | Purpose |
+| :--- | :--- | :--- |
+| **Streamlit App** | [http://localhost:8502](http://localhost:8502) (or `8501`) | Journey Inspector & Observability [V5] UI |
+| **Grafana** | [http://localhost:3000](http://localhost:3000) | Observability UI (`admin` / `admin` or anonymous) |
+| **Grafana AgentOps Dashboard** | [http://localhost:3000/d/ai-search-journey-overview/ai-search-journey-observability-overview](http://localhost:3000/d/ai-search-journey-overview/ai-search-journey-observability-overview) | Overview dashboard for V1–V4 stages |
+| **Tempo Explore** | [http://localhost:3000/explore](http://localhost:3000/explore) | Distributed trace exploration |
+| **Prometheus** | [http://localhost:9090](http://localhost:9090) | Metrics scraping & PromQL queries |
+| **OTel Collector (OTLP HTTP)** | `http://localhost:4318` | Ingestion endpoint for traces & metrics |
+| **Tempo Ingestion** | `http://localhost:3200` | Direct Tempo HTTP endpoint |
+
+#### 6. Environment Variables
+
+Configure via `.env` or shell environment:
+```env
+# Optional: Local Dockerized Observability Stack
+OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4318"
+OTEL_SERVICE_NAME="ai_search_journey"
+OTEL_METRICS_ENABLED=true
+GRAFANA_URL="http://localhost:3000"
+```
+
+For complete architectural details, configuration files, and troubleshooting, see the [Bonus-B Dockerized Observability Guide](docs/bonus-b-dockerized-observability.md).
 
 ---
 

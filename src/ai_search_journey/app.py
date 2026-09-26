@@ -54,9 +54,27 @@ DEFAULT_DENTIST_QUERY = (
 )
 
 
+_endpoints_logged: bool = False
+
+
+def _log_observability_startup() -> None:
+    """Print local observability endpoints once on startup."""
+    global _endpoints_logged
+    if not _endpoints_logged:
+        grafana_base = settings.grafana_url.rstrip("/")
+        dashboard_url = (
+            f"{grafana_base}/d/ai-search-journey-overview/ai-search-journey-observability-overview"
+        )
+        tempo_url = f"{grafana_base}/explore"
+        print(f"\n🚀 Grafana AgentOps Dashboard:\n   {dashboard_url}")
+        print(f"🔎 Tempo Explore:\n   {tempo_url}\n")
+        _endpoints_logged = True
+
+
 def render_app() -> None:
     """Render the main Streamlit Search Journey Inspector application."""
     init_telemetry()
+    _log_observability_startup()
 
     st.set_page_config(
         page_title="AI Search Journey Lab",
