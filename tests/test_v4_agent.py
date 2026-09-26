@@ -37,6 +37,15 @@ def test_agent_uses_canonical_gemini_model_and_sys_executable(
         assert server_params.server_params.command == sys.executable
 
 
+def test_agent_mcp_connection_timeout_is_configured() -> None:
+    """V4 agent configures StdioConnectionParams timeout to 30.0 seconds for Cloud Run."""
+    agent = create_v4_agent()
+    toolset = agent.tools[0]
+    connection_params = getattr(toolset, "connection_params", None)
+    assert connection_params is not None
+    assert connection_params.timeout == 30.0
+
+
 def test_mcp_server_exposes_read_only_tools() -> None:
     """2. MCP server exposes the named read-only tools including get_available_history."""
     from ai_search_journey.visibility.mcp_server import (
