@@ -24,14 +24,31 @@ _SENSITIVE_KEY_SUBSTRINGS = (
     "bearer",
     "api_key",
     "apikey",
+    "prompt",
+    "raw_prompt",
+    "user_prompt",
+    "system_prompt",
+    "model_output",
+    "response_text",
+    "query_text",
+    "raw_query",
 )
 
 
 def sanitize_string(val: str, max_length: int = 500) -> str:
-    """Sanitize strings by removing secrets and truncating excessive length."""
+    """Sanitize strings by removing secrets, stripping URL query parameters, and truncating."""
     if not val:
         return ""
     res = val
+    if res.startswith("http://") or res.startswith("https://"):
+        try:
+            parsed = urlparse(res)
+            scheme = parsed.scheme or "https"
+            netloc = parsed.netloc.split("@")[-1]
+            res = f"{scheme}://{netloc}{parsed.path}"
+        except Exception:
+            return "[INVALID_URL]"
+
     for pat in _API_KEY_PATTERNS:
         res = pat.sub("[REDACTED]", res)
 
@@ -50,7 +67,7 @@ def sanitize_url(url: str | None) -> str | None:
         scheme = parsed.scheme or "https"
         netloc = parsed.netloc.split("@")[-1]  # remove username:password if present
         clean = f"{scheme}://{netloc}{parsed.path}"
-        return sanitize_string(clean)
+        return clean
     except Exception:
         return "[INVALID_URL]"
 

@@ -51,6 +51,8 @@ DEFAULT_INDIAN_QUERY = (
 
 def render_app() -> None:
     """Render the main Streamlit Search Journey Inspector application."""
+    init_telemetry()
+
     st.set_page_config(
         page_title="AI Search Journey Lab",
         page_icon="🔍",
@@ -134,8 +136,6 @@ def render_app() -> None:
             st.session_state.journey_result = None
             st.error(f"Error during journey execution: {e}")
             return
-
-    init_telemetry()
 
     journey = st.session_state.journey_result
     if not journey:

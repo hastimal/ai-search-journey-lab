@@ -48,7 +48,7 @@ class TelemetryStore:
         self._max_spans_per_run = max_spans_per_run
         self._access_lock = threading.RLock()
         # Keep track of run order in FIFO
-        self._run_order: deque[str] = deque(maxlen=max_runs)
+        self._run_order: deque[str] = deque()
         # Map run_id -> list of spans
         self._spans_by_run: dict[str, list[TelemetrySpanView]] = {}
         # Map run_id -> run metadata (e.g. stage, start_time, duration, status)
@@ -60,6 +60,8 @@ class TelemetryStore:
         with cls._lock:
             if cls._instance is None:
                 cls._instance = cls(max_runs=max_runs)
+            elif max_runs != 50:
+                cls._instance._max_runs = max_runs
             return cls._instance
 
     def clear(self) -> None:
@@ -80,11 +82,13 @@ class TelemetryStore:
                         continue
                     safe_attrs[str(k)] = sanitize_attribute_value(v)
 
-            # Determine run_id from attributes or fallback to trace_id
-            run_id = str(safe_attrs.get("journey.run_id")
-                         or safe_attrs.get("visibility.scan_id")
-                         or safe_attrs.get("v4.session_id")
-                         or f"trace_{span.context.trace_id:032x}")
+            # Group executions by OpenTelemetry trace ID (canonical safe internal ID)
+            trace_hex = f"trace_{span.context.trace_id:032x}"
+            run_id = (
+                str(safe_attrs.get("journey.run_id"))
+                if "journey.run_id" in safe_attrs
+                else trace_hex
+            )
 
             # Identify stage
             stage = "v1"

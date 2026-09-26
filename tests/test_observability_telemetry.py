@@ -119,18 +119,68 @@ def test_span_failure_capture_sanitized(clean_telemetry_store: TelemetryStore):
 
 
 def test_bounded_retention_fifo(clean_telemetry_store: TelemetryStore):
-    """Verify TelemetryStore enforces bounded FIFO capacity."""
+    """Verify TelemetryStore enforces bounded FIFO capacity, evicting oldest run and its spans."""
     # Max runs is set to 5 in fixture
     for i in range(8):
-        with trace_span(f"step_{i}", run_id=f"run_{i}"):
+        with trace_span(f"step_{i}", run_id=f"run_{i}", attributes={"metric_val": i}):
             pass
 
     runs = clean_telemetry_store.get_runs()
+    # Retained run count does not exceed configured maximum of 5
     assert len(runs) == 5
-    # Oldest runs (run_0, run_1, run_2) should have been evicted
     run_ids = [r["run_id"] for r in runs]
+
+    # Oldest runs (run_0, run_1, run_2) are completely absent from runs list
     assert "run_0" not in run_ids
     assert "run_1" not in run_ids
     assert "run_2" not in run_ids
+
+    # Spans of evicted runs are completely removed from store
+    assert clean_telemetry_store.get_spans_for_run("run_0") == []
+    assert clean_telemetry_store.get_spans_for_run("run_1") == []
+    assert clean_telemetry_store.get_spans_for_run("run_2") == []
+
+    # Newest runs are present with their spans
     assert "run_7" in run_ids
     assert "run_6" in run_ids
+    assert len(clean_telemetry_store.get_spans_for_run("run_7")) == 1
+
+
+def test_trace_span_end_to_end_redaction(clean_telemetry_store: TelemetryStore):
+    """Verify trace_span handles unsafe attributes, stripping secrets and URL query params."""
+    unsafe_attributes = {
+        "raw_prompt": "Find coffee near Geekdom with secret prompt details",
+        "user_prompt": "Tell me everything about the competitor",
+        "api_key": "AIzaSyFakeGoogleApiKey123456789012345678",
+        "authorization": "Bearer ya29.a0AfH6SMDUMMYTOKENFORTEST",
+        "target_url": "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=29.4,-98.4&key=AIzaSySecretKey",
+        "safe_count": 42,
+        "is_supported": True,
+    }
+
+    run_id = "run_redaction_e2e"
+    with trace_span("operation.with_unsafe_attrs", attributes=unsafe_attributes, run_id=run_id):
+        pass
+
+    spans = clean_telemetry_store.get_spans_for_run(run_id)
+    assert len(spans) == 1
+    stored_span = spans[0]
+    attrs = stored_span.attributes
+
+    # Sensitive keys (prompts, api keys, auth tokens) are omitted
+    assert "raw_prompt" not in attrs
+    assert "user_prompt" not in attrs
+    assert "api_key" not in attrs
+    assert "authorization" not in attrs
+    assert "AIza" not in str(attrs)
+    assert "ya29." not in str(attrs)
+
+    # URL query parameters are stripped
+    assert "target_url" in attrs
+    assert attrs["target_url"] == "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+    assert "location=" not in attrs["target_url"]
+    assert "key=" not in attrs["target_url"]
+
+    # Safe attributes are retained
+    assert attrs.get("safe_count") == 42
+    assert attrs.get("is_supported") is True
