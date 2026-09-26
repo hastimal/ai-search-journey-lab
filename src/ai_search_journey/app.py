@@ -19,6 +19,7 @@ from ai_search_journey.models import (
     JourneyStepTiming,
     ToolName,
 )
+from ai_search_journey.telemetry import init_telemetry
 from ai_search_journey.ui_assets import (
     render_app_title,
     render_header_logos,
@@ -33,6 +34,7 @@ from ai_search_journey.ui_formatters import (
     format_source_badge,
     render_execution_timeline,
 )
+from ai_search_journey.ui_observability import render_observability_tab
 from ai_search_journey.visibility.ui import render_visibility_tab
 from ai_search_journey.visibility.ui_v4 import render_visibility_agent_tab
 
@@ -133,13 +135,16 @@ def render_app() -> None:
             st.error(f"Error during journey execution: {e}")
             return
 
+    init_telemetry()
+
     journey = st.session_state.journey_result
     if not journey:
-        tab_v1, tab_v2, tab_v3, tab_v4 = st.tabs([
+        tab_v1, tab_v2, tab_v3, tab_v4, tab_v5 = st.tabs([
             "Search to Decision [V1]",
             "Journey Analysis [V2]",
             "AI Visibility [V3]",
             "AI Visibility Agent [V4]",
+            "Observability [V5]",
         ])
         with tab_v1:
             render_journey_hint()
@@ -149,18 +154,21 @@ def render_app() -> None:
             render_visibility_tab(None)
         with tab_v4:
             render_visibility_agent_tab()
+        with tab_v5:
+            render_observability_tab()
         return
 
     # 3. Search Journey Complete Collapsible Expander (Default collapsed)
     if journey.execution_trace:
         render_execution_timeline(journey.execution_trace, journey=journey)
 
-    # Capability Tabs: V1 (Search to Decision), V2 (Journey Analysis), V3 (AI Visibility), V4
-    tab_v1, tab_v2, tab_v3, tab_v4 = st.tabs([
+    # Capability Tabs: V1 (Search to Decision), V2 (Journey Analysis), V3 (AI Visibility), V4, V5
+    tab_v1, tab_v2, tab_v3, tab_v4, tab_v5 = st.tabs([
         "Search to Decision [V1]",
         "Journey Analysis [V2]",
         "AI Visibility [V3]",
         "AI Visibility Agent [V4]",
+        "Observability [V5]",
     ])
 
     # ==================================================================
@@ -548,6 +556,12 @@ def render_app() -> None:
     # ==================================================================
     with tab_v4:
         render_visibility_agent_tab()
+
+    # ==================================================================
+    # TAB 5: Observability [V5]
+    # ==================================================================
+    with tab_v5:
+        render_observability_tab()
 
 if __name__ == "__main__":
     render_app()
