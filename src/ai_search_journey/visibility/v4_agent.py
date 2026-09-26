@@ -42,7 +42,10 @@ def create_v4_agent() -> Agent:
         args=["-m", "ai_search_journey.visibility.mcp_server"],
         env=os.environ.copy()
     )
-    mcp_params = StdioConnectionParams(server_params=server_params)
+    mcp_params = StdioConnectionParams(
+        server_params=server_params,
+        timeout=30.0,
+    )
 
     mcp_toolset = McpToolset(connection_params=mcp_params)
 
