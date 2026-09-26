@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     bigquery_dataset: str = "ai_search_journey_v3"
     bigquery_location: str = "US"
 
+    # OpenTelemetry / Observability export configuration (Optional)
+    otel_exporter_otlp_endpoint: Optional[str] = None
+    otel_service_name: str = "ai_search_journey"
+    otel_metrics_enabled: bool = False
+    grafana_url: str = "http://localhost:3000"
+
     @field_validator(
         "gemini_api_key",
         "gemini_model",
@@ -34,6 +40,8 @@ class Settings(BaseSettings):
         "bigquery_project",
         "bigquery_dataset",
         "bigquery_location",
+        "otel_exporter_otlp_endpoint",
+        "otel_service_name",
         mode="before",
     )
     @classmethod

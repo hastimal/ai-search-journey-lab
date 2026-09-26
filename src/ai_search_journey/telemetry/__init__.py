@@ -1,5 +1,10 @@
 """OpenTelemetry in-memory observability module for AI Search Journey Lab."""
 
+from ai_search_journey.telemetry.exporter import (
+    MetricsRegistry,
+    OtlpHttpJsonMetricsExporter,
+    OtlpHttpJsonSpanExporter,
+)
 from ai_search_journey.telemetry.redaction import (
     is_sensitive_key,
     sanitize_attribute_value,
@@ -16,6 +21,9 @@ __all__ = [
     "trace_span",
     "TelemetryStore",
     "TelemetrySpanView",
+    "MetricsRegistry",
+    "OtlpHttpJsonMetricsExporter",
+    "OtlpHttpJsonSpanExporter",
     "sanitize_string",
     "sanitize_url",
     "sanitize_error_message",

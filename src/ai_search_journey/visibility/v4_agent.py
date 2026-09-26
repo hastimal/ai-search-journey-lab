@@ -103,29 +103,70 @@ class VisibilityAnalyticsAgent:
         with trace_span(
             "v4.agent.chat_turn",
             attributes={
+                "workflow.stage": "v4",
                 "v4.session_id": session_id,
                 "v4.query_length": len(query),
+                "storage.backend": "bigquery" if settings.bigquery_project else "memory",
             },
         ) as turn_span:
-            events = runner.run(
-                user_id="user1",
-                session_id=session_id,
-                new_message=types.Content(role="user", parts=[types.Part.from_text(text=query)])
-            )
+            with trace_span(
+                "v4.agent.load_context",
+                attributes={
+                    "workflow.stage": "v4",
+                    "v4.session_id": session_id,
+                    "agent.operation": "load_context",
+                    "storage.backend": "bigquery" if settings.bigquery_project else "memory",
+                },
+            ):
+                # Prepare runner context & message payload
+                msg_content = types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=query)],
+                )
 
-            texts = []
-            for event in events:
-                if hasattr(event, "text") and event.text:
-                    texts.append(str(event.text))
-                elif (
-                    hasattr(event, "content")
-                    and event.content
-                    and getattr(event.content, "parts", None)
-                ):
-                    for part in event.content.parts:  # type: ignore[union-attr]
-                        if hasattr(part, "text") and part.text:
-                            texts.append(str(part.text))
-            res = "".join(texts)
+            with trace_span(
+                "v4.agent.gemini_generate",
+                attributes={
+                    "workflow.stage": "v4",
+                    "v4.session_id": session_id,
+                    "agent.operation": "gemini_generate",
+                    "model.name": settings.gemini_model,
+                },
+            ):
+                events = list(
+                    runner.run(
+                        user_id="user1",
+                        session_id=session_id,
+                        new_message=msg_content,
+                    )
+                )
+
+            with trace_span(
+                "v4.agent.response",
+                attributes={
+                    "workflow.stage": "v4",
+                    "v4.session_id": session_id,
+                    "agent.operation": "format_response",
+                },
+            ) as resp_span:
+                texts = []
+                for event in events:
+                    if hasattr(event, "text") and event.text:
+                        texts.append(str(event.text))
+                    elif (
+                        hasattr(event, "content")
+                        and event.content
+                        and getattr(event.content, "parts", None)
+                    ):
+                        for part in event.content.parts:  # type: ignore[union-attr]
+                            if hasattr(part, "text") and part.text:
+                                texts.append(str(part.text))
+                res = "".join(texts)
+                if resp_span.is_recording():
+                    resp_span.set_attribute("v4.response_length", len(res))
+                    resp_span.set_attribute("success", bool(res))
+
             if turn_span.is_recording():
                 turn_span.set_attribute("v4.response_length", len(res))
+                turn_span.set_attribute("success", bool(res))
             return res

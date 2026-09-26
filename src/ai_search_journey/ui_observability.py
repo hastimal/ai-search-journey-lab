@@ -4,10 +4,9 @@ Visualizes in-process OpenTelemetry traces, spans, execution timelines,
 status codes, and sanitized attributes across V1–V4 workflows.
 """
 
-from __future__ import annotations
-
 import streamlit as st
 
+from ai_search_journey.config import settings
 from ai_search_journey.telemetry.store import TelemetryStore
 
 
@@ -20,9 +19,39 @@ def render_observability_tab() -> None:
     )
 
     st.info(
-        "🔒 **Local Telemetry & Privacy Guard**: Telemetry is buffered in-process with a bounded "
-        "FIFO store. No credentials, raw prompts, or external telemetry exporters are used."
+        "🔒 **Local Telemetry & Privacy Guard**: Raw prompts, credentials, and sensitive content "
+        "are not exported. Telemetry is buffered in-process and can also be sent to the local "
+        "OpenTelemetry observability stack when enabled."
     )
+
+    # Local Grafana Observability stack shortcuts
+    grafana_base = settings.grafana_url.rstrip("/")
+    grafana_dashboard_url = (
+        f"{grafana_base}/d/ai-search-journey-overview/ai-search-journey-observability-overview"
+    )
+    tempo_explore_url = f"{grafana_base}/explore"
+
+    col_btn1, col_btn2, _ = st.columns([1.2, 1.0, 2.0])
+    with col_btn1:
+        if hasattr(st, "link_button"):
+            st.link_button(
+                "📊 Open Grafana AgentOps Dashboard",
+                grafana_dashboard_url,
+                help="Open local Grafana overview dashboard",
+            )
+        else:
+            st.markdown(f"[📊 Open Grafana AgentOps Dashboard]({grafana_dashboard_url})")
+    with col_btn2:
+        if hasattr(st, "link_button"):
+            st.link_button(
+                "🔎 Open Tempo Explore",
+                tempo_explore_url,
+                help="Explore distributed traces in Tempo",
+            )
+        else:
+            st.markdown(f"[🔎 Open Tempo Explore]({tempo_explore_url})")
+
+    st.divider()
 
     store = TelemetryStore.get_instance()
     runs = store.get_runs()
@@ -63,12 +92,16 @@ def render_observability_tab() -> None:
         for r in filtered_runs
     ]
     with col_run:
+        # Key selector by stage filter to ensure clean reset/revalidation when filter changes
         selected_idx = st.selectbox(
             "Select Execution Run",
             options=range(len(run_options)),
             format_func=lambda i: run_options[i],
-            key="v5_selected_run_idx",
+            key=f"v5_selected_run_idx_{stage_code or 'all'}",
         )
+
+    if selected_idx is None or selected_idx >= len(filtered_runs):
+        selected_idx = 0
 
     selected_run = filtered_runs[selected_idx]
     run_id = selected_run["run_id"]
