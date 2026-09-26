@@ -64,7 +64,28 @@ v4.agent.chat_turn
 
 ## 4. Local Developer Workflow
 
-### Step 1: Start the Observability Stack
+### Recommended: One-Step Launch
+
+Launch the entire local observability stack, verify provisioning, and start Streamlit in one command:
+
+```bash
+python scripts/run_app_locally.py
+```
+
+This helper script automatically:
+1. Starts the Docker Compose observability stack (`otel-collector`, `tempo`, `prometheus`, `grafana`).
+2. Polls health endpoints until all services are ready.
+3. Confirms dashboard and datasource provisioning in Grafana.
+4. Starts the Streamlit application.
+
+---
+
+### Alternative: Manual Step-by-Step Launch
+
+<details>
+<summary><strong>Click to view manual Docker Compose instructions</strong></summary>
+
+#### Step 1: Start the Observability Stack
 
 Launch the Docker Compose stack in the background:
 
@@ -78,7 +99,7 @@ Verify that all services are healthy:
 docker compose -f docker-compose.observability.yml ps
 ```
 
-### Step 2: Configure Application Environment
+#### Step 2: Configure Application Environment
 
 Set the OTLP exporter endpoint in your `.env` or shell (disabled by default):
 
@@ -89,7 +110,7 @@ export OTEL_METRICS_ENABLED="true"
 export GRAFANA_URL="http://localhost:3000"
 ```
 
-### Step 3: Run AI Search Journey Lab
+#### Step 3: Run AI Search Journey Lab
 
 Start the Streamlit application:
 
@@ -97,15 +118,15 @@ Start the Streamlit application:
 streamlit run src/ai_search_journey/app.py
 ```
 
-Execute a search journey (V1), run an AI visibility scan (V3), or chat with the visibility agent (V4). All traces and metrics will automatically stream to both the in-app V5 Observability tab and the local Grafana stack.
-
-### Step 4: Stop the Stack
+#### Step 4: Stop the Stack
 
 To cleanly tear down the observability containers and remove temporary volumes:
 
 ```bash
 docker compose -f docker-compose.observability.yml down -v
 ```
+
+</details>
 
 ---
 
