@@ -627,7 +627,7 @@ Contributions, feedback, and experiment ideas are welcome!
 
 Contributions are welcome. Contributors are recognized through merged pull requests and the repository’s GitHub contributor graph.
 
-- [Harsh Jangid](https://github.com/harshjangid1015) — OpenTelemetry observability contribution (V5)
+- [Harsh Jangid](https://github.com/harshjangid1015) — OpenTelemetry and observability (V5)
 
 See the full contributor history on [GitHub](https://github.com/hastimal/ai-search-journey-lab/graphs/contributors).
 ---

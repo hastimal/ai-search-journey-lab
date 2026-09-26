@@ -135,3 +135,108 @@ def test_agent_run_simulated_empty_history(mock_run: mock.MagicMock) -> None:
 
     assert "history is empty" in answer
     mock_run.assert_called_once()
+
+
+def test_compare_brands_splits_18_brands_into_batches(monkeypatch: pytest.MonkeyPatch) -> None:
+    """1 & 2. 18 brand IDs are split into 2 repo calls, combined in stable input order."""
+    from ai_search_journey.visibility.mcp_server import compare_brands
+
+    mock_bq_repo = mock.MagicMock()
+    # Return metrics matching the requested batch
+    def fake_compare(req):
+        return mock.MagicMock(
+            model_dump=lambda: {
+                "metrics": [
+                    {"brand_id": bid, "total_scans": 5, "mention_rate": 0.5}
+                    for bid in req.brand_ids
+                ]
+            }
+        )
+
+    mock_bq_repo.compare_brands.side_effect = fake_compare
+    import ai_search_journey.visibility.mcp_server as mcp_mod
+    monkeypatch.setattr(mcp_mod, "repo", mock_bq_repo)
+
+    eighteen_brands = [f"brand_{i:02d}" for i in range(1, 19)]
+    res = compare_brands(
+        start_date="2026-01-01T00:00:00Z",
+        end_date="2026-06-01T00:00:00Z",
+        brand_ids=eighteen_brands,
+    )
+
+    assert "metrics" in res
+    assert len(res["metrics"]) == 18
+    # 18 brands should result in exactly 2 repo calls (10 and 8)
+    assert mock_bq_repo.compare_brands.call_count == 2
+    first_call_brands = mock_bq_repo.compare_brands.call_args_list[0][0][0].brand_ids
+    second_call_brands = mock_bq_repo.compare_brands.call_args_list[1][0][0].brand_ids
+    assert len(first_call_brands) == 10
+    assert len(second_call_brands) == 8
+    # Results combined in stable input order
+    returned_bids = [m["brand_id"] for m in res["metrics"]]
+    assert returned_bids == eighteen_brands
+
+
+def test_compare_brands_deduplicates_input_ids(monkeypatch: pytest.MonkeyPatch) -> None:
+    """3. Duplicate brand IDs are deduplicated and not queried twice."""
+    from ai_search_journey.visibility.mcp_server import compare_brands
+
+    mock_bq_repo = mock.MagicMock()
+    mock_bq_repo.compare_brands.return_value = mock.MagicMock(
+        model_dump=lambda: {
+            "metrics": [
+                {"brand_id": "brand_a", "total_scans": 3},
+                {"brand_id": "brand_b", "total_scans": 3},
+            ]
+        }
+    )
+    import ai_search_journey.visibility.mcp_server as mcp_mod
+    monkeypatch.setattr(mcp_mod, "repo", mock_bq_repo)
+
+    res = compare_brands(
+        start_date="2026-01-01T00:00:00Z",
+        end_date="2026-06-01T00:00:00Z",
+        brand_ids=["brand_a", "brand_b", "brand_a", "brand_b", "brand_a"],
+    )
+
+    assert "metrics" in res
+    assert len(res["metrics"]) == 2
+    mock_bq_repo.compare_brands.assert_called_once()
+    queried_bids = mock_bq_repo.compare_brands.call_args[0][0].brand_ids
+    assert queried_bids == ["brand_a", "brand_b"]
+
+
+def test_compare_brands_empty_and_over_limit_error_handling() -> None:
+    """4. Empty brand list and over-limit (>50) return structured safe responses without raising."""
+    from ai_search_journey.visibility.mcp_server import compare_brands
+
+    # Empty list
+    res_empty = compare_brands(
+        start_date="2026-01-01T00:00:00Z",
+        end_date="2026-06-01T00:00:00Z",
+        brand_ids=[],
+    )
+    assert "error" in res_empty
+    assert res_empty["metrics"] == []
+
+    # Over 50 brands
+    over_limit_brands = [f"brand_{i}" for i in range(55)]
+    res_over = compare_brands(
+        start_date="2026-01-01T00:00:00Z",
+        end_date="2026-06-01T00:00:00Z",
+        brand_ids=over_limit_brands,
+    )
+    assert "error" in res_over
+    assert "Maximum supported is 50" in res_over["error"]
+    assert res_over["metrics"] == []
+
+
+def test_v4_remains_strictly_read_only() -> None:
+    """5. V4 MCP server tools and analytics repository enforce strictly read-only boundary."""
+    from ai_search_journey.visibility.v4_analytics import BigQueryVisibilityAnalyticsRepository
+
+    # Confirm write methods do not exist
+    assert not hasattr(BigQueryVisibilityAnalyticsRepository, "save_bundle")
+    assert not hasattr(BigQueryVisibilityAnalyticsRepository, "insert_scan")
+    assert not hasattr(BigQueryVisibilityAnalyticsRepository, "write")
+    assert not hasattr(BigQueryVisibilityAnalyticsRepository, "delete")

@@ -209,7 +209,7 @@ def render_visibility_agent_tab() -> None:
 
         cols = st.columns(len(example_prompts))
         for i, prompt in enumerate(example_prompts):
-            if cols[i].button(prompt, key=f"v4_prompt_{i}", use_container_width=True):
+            if cols[i].button(prompt, key=f"v4_prompt_{i}", width="stretch"):
                 selected_prompt = prompt
 
     # 3. Chat Conversation History Container (oldest → newest)

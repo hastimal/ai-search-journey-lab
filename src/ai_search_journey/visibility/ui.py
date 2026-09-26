@@ -373,7 +373,7 @@ def render_visibility_tab(journey: Optional[JourneyResult]) -> None:
                 "Reset all V3 target fields, selected candidates, custom competitors, "
                 "and scan results without affecting the journey."
             ),
-            use_container_width=True,
+            width="stretch",
         ):
             reset_v3_session_state()
             st.rerun()
@@ -548,7 +548,7 @@ def render_visibility_tab(journey: Optional[JourneyResult]) -> None:
         run_scan_clicked = st.button(
             "Run Visibility Analysis",
             type="primary",
-            use_container_width=True,
+            width="stretch",
             disabled=is_blocked,
             key="v3_btn_run_scan",
         )
@@ -690,7 +690,7 @@ def render_scan_results(
         )
 
     if brand_table_rows:
-        st.dataframe(brand_table_rows, use_container_width=True, hide_index=True)
+        st.dataframe(brand_table_rows, width="stretch", hide_index=True)
 
     # 3. Technical Details (Expanders)
     with st.expander(f"🔗 Citations Discovered ({len(bundle.citations)})", expanded=False):
@@ -704,7 +704,7 @@ def render_scan_results(
                 }
                 for c in bundle.citations
             ]
-            st.dataframe(citation_rows, use_container_width=True, hide_index=True)
+            st.dataframe(citation_rows, width="stretch", hide_index=True)
         else:
             st.caption("No citations detected in grounding or final answer.")
 
@@ -724,7 +724,7 @@ def render_scan_results(
                 }
                 for fo in bundle.fanout_observations
             ]
-            st.dataframe(fo_rows, use_container_width=True, hide_index=True)
+            st.dataframe(fo_rows, width="stretch", hide_index=True)
         else:
             st.caption("No fan-out observations recorded.")
 
