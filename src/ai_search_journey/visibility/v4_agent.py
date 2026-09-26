@@ -95,22 +95,34 @@ class VisibilityAnalyticsAgent:
             app_name="test_app",
         )
 
-        events = runner.run(
-            user_id="user1",
-            session_id=session_id,
-            new_message=types.Content(role="user", parts=[types.Part.from_text(text=query)])
-        )
+        from ai_search_journey.telemetry import trace_span
 
-        texts = []
-        for event in events:
-            if hasattr(event, "text") and event.text:
-                texts.append(str(event.text))
-            elif (
-                hasattr(event, "content")
-                and event.content
-                and getattr(event.content, "parts", None)
-            ):
-                for part in event.content.parts:  # type: ignore[union-attr]
-                    if hasattr(part, "text") and part.text:
-                        texts.append(str(part.text))
-        return "".join(texts)
+        with trace_span(
+            "v4.agent.chat_turn",
+            attributes={
+                "v4.session_id": session_id,
+                "v4.query_length": len(query),
+            },
+        ) as turn_span:
+            events = runner.run(
+                user_id="user1",
+                session_id=session_id,
+                new_message=types.Content(role="user", parts=[types.Part.from_text(text=query)])
+            )
+
+            texts = []
+            for event in events:
+                if hasattr(event, "text") and event.text:
+                    texts.append(str(event.text))
+                elif (
+                    hasattr(event, "content")
+                    and event.content
+                    and getattr(event.content, "parts", None)
+                ):
+                    for part in event.content.parts:  # type: ignore[union-attr]
+                        if hasattr(part, "text") and part.text:
+                            texts.append(str(part.text))
+            res = "".join(texts)
+            if turn_span.is_recording():
+                turn_span.set_attribute("v4.response_length", len(res))
+            return res

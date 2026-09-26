@@ -12,6 +12,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 
 from ai_search_journey.models import JourneyResult, StepExecutionStatus
+from ai_search_journey.telemetry import trace_span
 from ai_search_journey.visibility.extractor import extract_visibility_scan_bundle
 from ai_search_journey.visibility.models import (
     BrandProfile,
@@ -154,118 +155,136 @@ def run_visibility_scan(
     5. Saves the resulting bundle through the provided VisibilityRepository exactly once.
     6. Returns a VisibilityScanResult exposing the persisted bundle.
     """
-    # 1. Validate completed JourneyResult
-    _validate_journey_result(journey)
+    with trace_span(
+        "visibility.scan_execution",
+        attributes={
+            "visibility.brand_id": target_brand.brand_id,
+            "visibility.competitors_count": len(competitor_brands),
+        },
+    ) as scan_span:
+        # 1. Validate completed JourneyResult
+        _validate_journey_result(journey)
 
-    # 2. Validate brand profiles
-    _validate_brand_profiles(target_brand, competitor_brands)
+        # 2. Validate brand profiles
+        _validate_brand_profiles(target_brand, competitor_brands)
 
-    # 3. Validate project consistency if provided
-    if project is not None:
-        if project.target_brand_id != target_brand.brand_id:
-            raise InconsistentScanError(
-                f"project.target_brand_id '{project.target_brand_id}' does not match "
-                f"target_brand.brand_id '{target_brand.brand_id}'"
-            )
-        for comp in competitor_brands:
-            if comp.brand_id not in project.competitor_brand_ids:
+        # 3. Validate project consistency if provided
+        if project is not None:
+            if project.target_brand_id != target_brand.brand_id:
                 raise InconsistentScanError(
-                    f"Competitor brand '{comp.brand_id}' is not configured in project "
-                    f"competitor_brand_ids {project.competitor_brand_ids}"
+                    f"project.target_brand_id '{project.target_brand_id}' does not match "
+                    f"target_brand.brand_id '{target_brand.brand_id}'"
+                )
+            for comp in competitor_brands:
+                if comp.brand_id not in project.competitor_brand_ids:
+                    raise InconsistentScanError(
+                        f"Competitor brand '{comp.brand_id}' is not configured in project "
+                        f"competitor_brand_ids {project.competitor_brand_ids}"
+                    )
+
+        # 4. Validate prompt consistency if provided
+        if prompt is not None:
+            if not prompt.enabled:
+                raise InconsistentScanError(f"Prompt '{prompt.prompt_id}' is disabled")
+
+        # 5. Resolve and validate VisibilityScan
+        now_utc = datetime.now(timezone.utc)
+        if scan is not None:
+            if scan.status == ScanStatus.FAILED:
+                raise InconsistentScanError("Cannot run visibility scan with FAILED status")
+
+            if scan.brand_id != target_brand.brand_id:
+                raise InconsistentScanError(
+                    f"scan.brand_id '{scan.brand_id}' does not match "
+                    f"target_brand.brand_id '{target_brand.brand_id}'"
                 )
 
-    # 4. Validate prompt consistency if provided
-    if prompt is not None:
-        if not prompt.enabled:
-            raise InconsistentScanError(f"Prompt '{prompt.prompt_id}' is disabled")
+            if project is not None and scan.project_id != project.project_id:
+                raise InconsistentScanError(
+                    f"scan.project_id '{scan.project_id}' does not match "
+                    f"project.project_id '{project.project_id}'"
+                )
 
-    # 5. Resolve and validate VisibilityScan
-    now_utc = datetime.now(timezone.utc)
-    if scan is not None:
-        if scan.status == ScanStatus.FAILED:
-            raise InconsistentScanError("Cannot run visibility scan with FAILED status")
+            if prompt is not None and scan.prompt_id != prompt.prompt_id:
+                raise InconsistentScanError(
+                    f"scan.prompt_id '{scan.prompt_id}' does not match "
+                    f"prompt.prompt_id '{prompt.prompt_id}'"
+                )
 
-        if scan.brand_id != target_brand.brand_id:
-            raise InconsistentScanError(
-                f"scan.brand_id '{scan.brand_id}' does not match "
-                f"target_brand.brand_id '{target_brand.brand_id}'"
-            )
-
-        if project is not None and scan.project_id != project.project_id:
-            raise InconsistentScanError(
-                f"scan.project_id '{scan.project_id}' does not match "
-                f"project.project_id '{project.project_id}'"
-            )
-
-        if prompt is not None and scan.prompt_id != prompt.prompt_id:
-            raise InconsistentScanError(
-                f"scan.prompt_id '{scan.prompt_id}' does not match "
-                f"prompt.prompt_id '{prompt.prompt_id}'"
-            )
-
-        # Transition pending or running scan to completed
-        if scan.status in (ScanStatus.PENDING, ScanStatus.RUNNING):
-            c_at = completed_at or now_utc
-            dur = (
-                scan.duration_seconds
-                if scan.duration_seconds is not None
-                else max(0.0, (c_at - scan.started_at).total_seconds())
-            )
-            resolved_scan = scan.model_copy(
-                update={
-                    "status": ScanStatus.COMPLETED,
-                    "completed_at": c_at,
-                    "duration_seconds": dur,
-                }
-            )
+            # Transition pending or running scan to completed
+            if scan.status in (ScanStatus.PENDING, ScanStatus.RUNNING):
+                c_at = completed_at or now_utc
+                dur = (
+                    scan.duration_seconds
+                    if scan.duration_seconds is not None
+                    else max(0.0, (c_at - scan.started_at).total_seconds())
+                )
+                resolved_scan = scan.model_copy(
+                    update={
+                        "status": ScanStatus.COMPLETED,
+                        "completed_at": c_at,
+                        "duration_seconds": dur,
+                    }
+                )
+            else:
+                resolved_scan = scan
         else:
-            resolved_scan = scan
-    else:
-        # Construct new completed scan from project/prompt/journey metadata
-        s_at = started_at or now_utc
-        c_at = completed_at or s_at
-        dur = max(0.0, (c_at - s_at).total_seconds())
+            # Construct new completed scan from project/prompt/journey metadata
+            s_at = started_at or now_utc
+            c_at = completed_at or s_at
+            dur = max(0.0, (c_at - s_at).total_seconds())
 
-        proj_id = project.project_id if project else "project_default"
-        p_id = prompt.prompt_id if prompt else "prompt_default"
-        p_text = prompt.prompt_text if prompt else journey.question
-        loc = (
-            prompt.reference_location
-            if prompt and prompt.reference_location
-            else (
-                journey.intent.reference_location
-                if journey.intent.reference_location
-                else (journey.reference_location.name if journey.reference_location else None)
+            proj_id = project.project_id if project else "project_default"
+            p_id = prompt.prompt_id if prompt else "prompt_default"
+            p_text = prompt.prompt_text if prompt else journey.question
+            loc = (
+                prompt.reference_location
+                if prompt and prompt.reference_location
+                else (
+                    journey.intent.reference_location
+                    if journey.intent.reference_location
+                    else (journey.reference_location.name if journey.reference_location else None)
+                )
             )
-        )
 
-        resolved_scan = VisibilityScan(
-            scan_id=scan_id or f"scan_{uuid4().hex[:12]}",
-            batch_id=batch_id,
-            project_id=proj_id,
-            brand_id=target_brand.brand_id,
-            brand_name_snapshot=target_brand.name,
-            brand_domain_snapshot=target_brand.domain,
-            prompt_id=p_id,
-            prompt_text_snapshot=p_text,
-            model_name=model_name,
-            location_snapshot=loc,
-            started_at=s_at,
-            completed_at=c_at,
-            status=ScanStatus.COMPLETED,
-            duration_seconds=dur,
-        )
+            resolved_scan = VisibilityScan(
+                scan_id=scan_id or f"scan_{uuid4().hex[:12]}",
+                batch_id=batch_id,
+                project_id=proj_id,
+                brand_id=target_brand.brand_id,
+                brand_name_snapshot=target_brand.name,
+                brand_domain_snapshot=target_brand.domain,
+                prompt_id=p_id,
+                prompt_text_snapshot=p_text,
+                model_name=model_name,
+                location_snapshot=loc,
+                started_at=s_at,
+                completed_at=c_at,
+                status=ScanStatus.COMPLETED,
+                duration_seconds=dur,
+            )
 
-    # 6. Call extract_visibility_scan_bundle exactly once
-    bundle = extract_visibility_scan_bundle(
-        scan=resolved_scan,
-        journey=journey,
-        target_brand=target_brand,
-        competitor_brands=list(competitor_brands),
-    )
+        if scan_span.is_recording():
+            scan_span.set_attribute("visibility.scan_id", resolved_scan.scan_id)
 
-    # 7. Save the resulting bundle through VisibilityRepository exactly once
-    repository.save_bundle(bundle)
+        # 6. Call extract_visibility_scan_bundle exactly once
+        with trace_span("visibility.extract_bundle") as e_span:
+            bundle = extract_visibility_scan_bundle(
+                scan=resolved_scan,
+                journey=journey,
+                target_brand=target_brand,
+                competitor_brands=list(competitor_brands),
+            )
+            if e_span.is_recording():
+                e_span.set_attribute("bundle.citations_count", len(bundle.citations))
+                e_span.set_attribute("bundle.observations_count", len(bundle.brand_observations))
 
-    # 8. Return typed result exposing the persisted bundle
-    return VisibilityScanResult(bundle=bundle, saved=True)
+        # 7. Save the resulting bundle through VisibilityRepository exactly once
+        with trace_span("visibility.save_bundle") as s_span:
+            repository.save_bundle(bundle)
+            if s_span.is_recording():
+                s_span.set_attribute("repository.saved", True)
+                s_span.set_attribute("repository.type", type(repository).__name__)
+
+        # 8. Return typed result exposing the persisted bundle
+        return VisibilityScanResult(bundle=bundle, saved=True)
