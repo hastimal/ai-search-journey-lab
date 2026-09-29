@@ -777,7 +777,7 @@ This repository is also documented through a seven-part technical article series
 
 1. [Search Journey Optimization with Gemini: From Query Fan-Out to Grounded Decisions](https://dev.to/hjangid/search-journey-optimization-with-gemini-from-query-fan-out-to-grounded-decisions-3f99) — Published
 2. [Building Grounded Local Search with Gemini and Google Maps on Google Cloud](https://dev.to/hjangid/building-grounded-local-search-with-gemini-and-google-maps-on-google-cloud-53lm) — Published
-3. Building an AI Search Visibility & Brand Analyzer with Gemini, BigQuery, and Google Search Grounding — Coming soon
+3. [Building an AI Search Visibility & Brand Analyzer with Gemini, BigQuery, and Google Search Grounding](https://dev.to/hjangid/building-an-ai-search-visibility-brand-analyzer-with-gemini-bigquery-and-google-search-grounding-286g) — Published
 4. Building an AI Visibility Agent with Gemini, Google ADK, MCP, and BigQuery — Coming soon
 5. From Query Fan-Out to Trace: Observing AI Search Journeys with OpenTelemetry — Coming soon
 6. Building AgentOps for Gemini Agents with Grafana, Tempo, and Prometheus — Coming soon
