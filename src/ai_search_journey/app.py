@@ -53,6 +53,11 @@ DEFAULT_DENTIST_QUERY = (
     "for a child anxious about dental visits."
 )
 
+DEFAULT_XAVIER_QUERY = (
+    "Find a Cajun or crawfish restaurant near Xavier University of Louisiana for 6 students, "
+    "open after 8 PM. Recommend the top 3."
+)
+
 
 _endpoints_logged: bool = False
 
@@ -96,6 +101,7 @@ def render_app() -> None:
                 "Coffee Shop @ Geekdom",
                 "Indian Restaurant @ Trinity",
                 "Pediatric Dentist @ UH",
+                "Cajun / Crawfish @ Xavier",
                 "Custom",
             ],
             index=0,
@@ -106,6 +112,8 @@ def render_app() -> None:
         default_val = DEFAULT_INDIAN_QUERY
     elif preset == "Pediatric Dentist @ UH":
         default_val = DEFAULT_DENTIST_QUERY
+    elif preset == "Cajun / Crawfish @ Xavier":
+        default_val = DEFAULT_XAVIER_QUERY
     elif preset == "Custom":
         default_val = ""
 
