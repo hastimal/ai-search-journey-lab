@@ -20,7 +20,6 @@ from ai_search_journey.doctor import (
     check_port_conflicts,
     check_python_version,
     is_module_available,
-    is_port_in_use,
     mask_secret,
     print_diagnostic_report,
     run_all_diagnostics,
@@ -199,7 +198,10 @@ def test_print_diagnostic_report_exit_codes() -> None:
 
 def test_run_all_diagnostics() -> None:
     """Ensure run_all_diagnostics executes default suite."""
-    dummy_check = lambda: DiagnosticResult("Cat", "Dummy", CheckStatus.PASS, "OK")
+
+    def dummy_check() -> DiagnosticResult:
+        return DiagnosticResult("Cat", "Dummy", CheckStatus.PASS, "OK")
+
     results = run_all_diagnostics([dummy_check])
     assert len(results) == 1
     assert results[0].status == CheckStatus.PASS

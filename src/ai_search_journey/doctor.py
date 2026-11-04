@@ -227,7 +227,10 @@ def check_docker_availability() -> DiagnosticResult:
             name="Docker",
             status=CheckStatus.WARN,
             message="Docker CLI binary not found in PATH",
-            remediation="Install Docker Desktop or Docker Engine if you plan to run containerized services.",
+            remediation=(
+                "Install Docker Desktop or Docker Engine "
+                "if you plan to run containerized services."
+            ),
         )
     try:
         proc = subprocess.run(
@@ -248,7 +251,7 @@ def check_docker_availability() -> DiagnosticResult:
             name="Docker",
             status=CheckStatus.WARN,
             message="Docker daemon is not running or current user lacks socket permissions",
-            remediation="Start Docker daemon: 'sudo systemctl start docker' or open Docker Desktop.",
+            remediation="Start Docker: 'sudo systemctl start docker' or open Docker Desktop.",
         )
     except (subprocess.TimeoutExpired, OSError) as e:
         return DiagnosticResult(
@@ -288,7 +291,10 @@ def check_port_conflicts(ports: Sequence[tuple[int, str]] | None = None) -> Diag
         name="Port Availability",
         status=CheckStatus.WARN,
         message=f"Ports currently in use: {', '.join(conflicts)}",
-        remediation="Check running processes or containers if encountering bind errors when starting services.",
+        remediation=(
+            "Check running processes or containers if encountering bind errors "
+            "when starting services."
+        ),
     )
 
 
