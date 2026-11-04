@@ -32,6 +32,7 @@ def test_mask_secret() -> None:
     assert mask_secret("") == "(not set)"
     assert mask_secret("   ") == "(not set)"
     assert mask_secret("short") == "********"
+    assert mask_secret("123456789012") == "********"
     assert mask_secret("AIzaSy1234567890abcdef") == "AIza...cdef"
     assert "1234567890" not in mask_secret("AIzaSy1234567890abcdef")
 
@@ -179,6 +180,18 @@ def test_check_filesystem_permissions() -> None:
     with patch("os.access", return_value=False):
         res = check_filesystem_permissions()
         assert res.status == CheckStatus.FAIL
+
+    # World-readable .env warning on POSIX
+    mock_stat = MagicMock(st_mode=0o100644)
+    with (
+        patch("os.access", return_value=True),
+        patch("pathlib.Path.exists", return_value=True),
+        patch("pathlib.Path.stat", return_value=mock_stat),
+        patch("os.name", "posix"),
+    ):
+        res = check_filesystem_permissions()
+        assert res.status == CheckStatus.WARN
+        assert "world-readable" in res.message
 
 
 def test_print_diagnostic_report_exit_codes() -> None:

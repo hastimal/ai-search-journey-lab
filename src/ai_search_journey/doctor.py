@@ -38,7 +38,7 @@ def mask_secret(value: str | None) -> str:
     if not value or not value.strip():
         return "(not set)"
     clean = value.strip().strip("'\"")
-    if len(clean) <= 8:
+    if len(clean) < 16:
         return "********"
     return f"{clean[:4]}...{clean[-4:]}"
 
@@ -310,14 +310,27 @@ def check_filesystem_permissions() -> DiagnosticResult:
             remediation="Ensure proper file permissions for the workspace directory.",
         )
     env_file = Path(".env")
-    if env_file.exists() and not os.access(env_file, os.R_OK):
-        return DiagnosticResult(
-            category="Filesystem",
-            name="Permissions",
-            status=CheckStatus.FAIL,
-            message=".env exists but is not readable",
-            remediation="Fix .env permissions: chmod 600 .env",
-        )
+    if env_file.exists():
+        if not os.access(env_file, os.R_OK):
+            return DiagnosticResult(
+                category="Filesystem",
+                name="Permissions",
+                status=CheckStatus.FAIL,
+                message=".env exists but is not readable",
+                remediation="Fix .env permissions: chmod 600 .env",
+            )
+        if os.name == "posix":
+            try:
+                if env_file.stat().st_mode & 0o004:
+                    return DiagnosticResult(
+                        category="Filesystem",
+                        name="Permissions",
+                        status=CheckStatus.WARN,
+                        message=".env file is world-readable, which may expose API keys",
+                        remediation="Restrict permissions: chmod 600 .env",
+                    )
+            except OSError:
+                pass
     return DiagnosticResult(
         category="Filesystem",
         name="Permissions",
