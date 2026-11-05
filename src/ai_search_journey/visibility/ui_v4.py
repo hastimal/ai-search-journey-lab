@@ -6,25 +6,29 @@ import streamlit as st
 
 from ai_search_journey.config import settings
 from ai_search_journey.visibility.bigquery_repository import _get_bigquery_module
+from ai_search_journey.visibility.history_factory import get_configured_backend
 
 
 def check_readiness() -> tuple[bool, str]:
     """Check if all requirements are met to run the V4 Agent."""
-    if _get_bigquery_module() is None:
-        return False, "⚠️ The `google-cloud-bigquery` dependency is missing."
+    backend = get_configured_backend()
 
     gemini_key = settings.gemini_api_key or os.environ.get("GEMINI_API_KEY")
     if not gemini_key or gemini_key == "your_gemini_api_key_here":
         return False, "⚠️ GEMINI_API_KEY is not configured. Add it to your `.env` file."
 
-    if not settings.bigquery_project or settings.bigquery_project == "your-gcp-project":
-        return False, "⚠️ BigQuery `BIGQUERY_PROJECT` is not configured in `.env`."
+    if backend == "bigquery":
+        if _get_bigquery_module() is None:
+            return False, "⚠️ The `google-cloud-bigquery` dependency is missing."
 
-    if not settings.bigquery_dataset:
-        return False, "⚠️ BigQuery `BIGQUERY_DATASET` is not configured in `.env`."
+        if not settings.bigquery_project or settings.bigquery_project == "your-gcp-project":
+            return False, "⚠️ BigQuery `BIGQUERY_PROJECT` is not configured in `.env`."
 
-    if not settings.bigquery_location:
-        return False, "⚠️ BigQuery `BIGQUERY_LOCATION` is not configured in `.env`."
+        if not settings.bigquery_dataset:
+            return False, "⚠️ BigQuery `BIGQUERY_DATASET` is not configured in `.env`."
+
+        if not settings.bigquery_location:
+            return False, "⚠️ BigQuery `BIGQUERY_LOCATION` is not configured in `.env`."
 
     return True, ""
 
@@ -45,8 +49,11 @@ def _process_agent_query(query_text: str) -> None:
                 st.markdown(response)
 
                 with st.expander("Sources / analysis window", expanded=False):
+                    is_bq = get_configured_backend() == "bigquery"
+                    backend_label = "BigQuery" if is_bq else "Local SQLite"
                     st.caption(
-                        "Agent used read-only MCP analytics tools to inspect BigQuery history."
+                        f"Agent used read-only MCP analytics tools to inspect "
+                        f"{backend_label} history."
                     )
 
                 st.session_state["v4_chat_history"].append({"role": "user", "content": query_text})
@@ -79,9 +86,11 @@ def _process_agent_query(query_text: str) -> None:
 def render_visibility_agent_tab() -> None:
     """Renders the AI Visibility Agent [V4] tab."""
     st.header("AI Visibility Agent [V4]")
-    st.write("Conversational analysis of persisted V3 BigQuery visibility history.")
+    backend = get_configured_backend()
+    backend_display = "BigQuery" if backend == "bigquery" else "Local SQLite"
+    st.write(f"Conversational analysis of persisted V3 {backend_display} visibility history.")
     st.info(
-        "🔒 **Read-only BigQuery analysis**: The agent strictly analyzes historical data "
+        f"🔒 **Read-only {backend_display} analysis**: The agent strictly analyzes historical data "
         "and cannot modify the repository or trigger new scans."
     )
 

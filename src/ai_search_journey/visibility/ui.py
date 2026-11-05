@@ -19,6 +19,10 @@ from ai_search_journey.visibility.bigquery_schema import (
     validate_location,
     validate_project_id,
 )
+from ai_search_journey.visibility.history_factory import (
+    get_configured_backend,
+    get_visibility_repository,
+)
 from ai_search_journey.visibility.models import (
     BrandProfile,
     BrandRole,
@@ -128,7 +132,11 @@ def is_bigquery_available(cfg: Optional[Settings] = None) -> tuple[bool, str]:
 def init_v3_session_state() -> None:
     """Initialize V3-namespaced session state variables."""
     if "v3_repo" not in st.session_state:
-        st.session_state["v3_repo"] = InMemoryVisibilityRepository()
+        configured_backend = get_configured_backend()
+        if configured_backend == "local":
+            st.session_state["v3_repo"] = get_visibility_repository()
+        else:
+            st.session_state["v3_repo"] = InMemoryVisibilityRepository()
     if "v3_scan_result" not in st.session_state:
         st.session_state["v3_scan_result"] = None
     if "v3_custom_competitors" not in st.session_state:
@@ -563,6 +571,7 @@ def render_visibility_tab(journey: Optional[JourneyResult]) -> None:
         # Select Repository
         repository: VisibilityRepository
         is_bq_selected = bq_available and storage_choice == "BigQuery history"
+        configured_backend = get_configured_backend()
         if is_bq_selected:
             try:
                 from ai_search_journey.visibility.bigquery_repository import (
@@ -578,6 +587,8 @@ def render_visibility_tab(journey: Optional[JourneyResult]) -> None:
             except Exception as bq_err:
                 st.error(f"Failed to initialize BigQuery repository: {bq_err}")
                 return
+        elif configured_backend == "local":
+            repository = get_visibility_repository()
         else:
             repository = st.session_state["v3_repo"]
 
@@ -596,6 +607,11 @@ def render_visibility_tab(journey: Optional[JourneyResult]) -> None:
                 if is_bq_selected:
                     st.success(
                         "✓ Visibility scan completed and saved to BigQuery "
+                        f"(Scan ID: `{scan_result.scan_id}`)."
+                    )
+                elif configured_backend == "local":
+                    st.success(
+                        "✓ Visibility scan completed and saved to local persistent history "
                         f"(Scan ID: `{scan_result.scan_id}`)."
                     )
                 else:

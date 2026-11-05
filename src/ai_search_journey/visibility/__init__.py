@@ -32,6 +32,11 @@ from ai_search_journey.visibility.extractor import (
     extract_visibility_scan_bundle,
     match_candidate_to_brand,
 )
+from ai_search_journey.visibility.history_factory import (
+    get_configured_backend,
+    get_visibility_analytics_repository,
+    get_visibility_repository,
+)
 from ai_search_journey.visibility.metrics import (
     VisibilityTrendPoint,
     calculate_competitor_comparison,
@@ -65,6 +70,9 @@ from ai_search_journey.visibility.runner import (
     VisibilityScanResult,
     run_visibility_scan,
 )
+from ai_search_journey.visibility.sqlite_repository import (
+    SQLiteVisibilityRepository,
+)
 from ai_search_journey.visibility.ui import render_visibility_tab
 
 __all__ = [
@@ -86,6 +94,7 @@ __all__ = [
     "InvalidRepositoryFilterError",
     "LOCK_KEY_BUNDLE_WRITE",
     "PromptDefinition",
+    "SQLiteVisibilityRepository",
     "ScanStatus",
     "TABLE_BRAND_OBSERVATIONS",
     "TABLE_BUNDLE_PAYLOADS",
@@ -108,10 +117,13 @@ __all__ = [
     "calculate_visibility_trend",
     "extract_brand_mentions",
     "extract_visibility_scan_bundle",
+    "get_configured_backend",
     "get_repository_locks_ddl",
     "get_repository_locks_seed_dml",
     "get_schema_ddl_statements",
     "get_schema_seed_statements",
+    "get_visibility_analytics_repository",
+    "get_visibility_repository",
     "match_candidate_to_brand",
     "normalize_domain",
     "render_visibility_tab",

@@ -1,6 +1,7 @@
 """Helper script to launch the Streamlit Search Journey Inspector GUI with local observability."""
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -127,6 +128,10 @@ def main() -> None:
     print("   http://localhost:9090")
     print("==================================================\n")
 
+    # Ensure local persistent history backend is configured by default for local execution
+    env = os.environ.copy()
+    env.setdefault("AI_SEARCH_HISTORY_BACKEND", "local")
+
     cmd = [
         sys.executable,
         "-m",
@@ -135,7 +140,7 @@ def main() -> None:
         "src/ai_search_journey/app.py",
     ]
     try:
-        sys.exit(subprocess.call(cmd))
+        sys.exit(subprocess.call(cmd, env=env))
     except KeyboardInterrupt:
         sys.exit(0)
 

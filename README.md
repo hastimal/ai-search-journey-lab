@@ -574,13 +574,48 @@ For complete architectural details, configuration files, and troubleshooting, se
 
 ### AI Visibility Agent [V4] (Read-Only Conversational Agent)
 
-The **V4 AI Visibility Agent** provides a natural language conversational interface over persisted V3 BigQuery visibility history.
+The **V4 AI Visibility Agent** provides a natural language conversational interface over persisted V3 visibility history.
 
 > [!IMPORTANT]
 > **Strict Read-Only Architecture:**
-> - V4 is an **AI Visibility Agent**, not a new scan engine. It strictly queries historical data already persisted by V3 scans in BigQuery.
-> - **No write operations:** V4 never writes to BigQuery, inserts records, or triggers new V1/V3 live scans.
-> - **Isolated execution:** Uses parameterized BigQuery queries without dynamic SQL generation.
+> - V4 is an **AI Visibility Agent**, not a new scan engine. It strictly queries historical data already persisted by V3 scans in SQLite or BigQuery.
+> - **No write operations:** V4 never writes to storage backends, inserts records, or triggers new V1/V3 live scans.
+> - **Configurable storage backend:** Supports persistent local storage via SQLite (default for local workflows) or BigQuery for cloud deployments.
+
+#### History Backend Architecture
+
+Both V3 visibility scan writes and V4 MCP analytics tools share the exact same configured backend:
+
+```mermaid
+flowchart TD
+    subgraph Local_Mode ["LOCAL MODE (AI_SEARCH_HISTORY_BACKEND=local)"]
+        V3_L[V3 Visibility Scan] --> SQLite[(Local SQLite History: .data/visibility_history.db)]
+        SQLite --> MCP_L[MCP Server]
+        MCP_L --> Agent_L[V4 AI Visibility Agent]
+        Agent_L --> Chatbot_L[Chatbot UI]
+    end
+
+    subgraph Cloud_Mode ["CLOUD MODE (AI_SEARCH_HISTORY_BACKEND=bigquery)"]
+        V3_C[V3 Visibility Scan] --> BQ[(BigQuery History: ai_search_journey_v3)]
+        BQ --> MCP_C[MCP Server]
+        MCP_C --> Agent_C[V4 AI Visibility Agent]
+        Agent_C --> Chatbot_C[Chatbot UI]
+    end
+```
+
+#### Backend Configuration Settings
+
+| Setting | Values | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `AI_SEARCH_HISTORY_BACKEND` | `local` \| `bigquery` | `local` (in local launcher) | Active backend for both V3 writing and V4/MCP reading. |
+| `LOCAL_HISTORY_DB_PATH` | File path | `.data/visibility_history.db` | Local SQLite database file location (automatically initialized). |
+| `BIGQUERY_PROJECT` | GCP Project ID | `None` | Google Cloud project ID (required if `bigquery` is selected). |
+| `BIGQUERY_DATASET` | Dataset ID | `ai_search_journey_v3` | BigQuery dataset containing fact tables. |
+| `BIGQUERY_LOCATION` | Region | `US` | BigQuery dataset location. |
+
+- **Local Backend (`local`):** Automatically initializes schema on first write/read in `.data/visibility_history.db`. Survives application restarts and is shared seamlessly between Streamlit and MCP subprocesses without requiring BigQuery or GCP credentials.
+- **Clearing Local History:** Simply delete `.data/visibility_history.db` (e.g. `rm -rf .data/`). It will be recreated cleanly on the next scan.
+- **BigQuery Backend (`bigquery`):** Explicitly queries Google Cloud BigQuery. If the configured dataset or credentials are unavailable, actionable error messages are returned without silent fallbacks or credential leakage.
 
 #### Architecture Flow
 
@@ -588,14 +623,14 @@ The **V4 AI Visibility Agent** provides a natural language conversational interf
 flowchart TD
     User([Streamlit UI Composer]) -->|Natural language question| Agent[Gemini / Google ADK Agent]
     Agent -->|Stdio JSON-RPC tool calls| MCP[Local MCP Server]
-    MCP -->|Parameterized SQL| BQ[(BigQuery V3 History)]
-    BQ -.->|Historical metrics & scan bounds| MCP
+    MCP -->|Local SQLite or BigQuery| Store[(Visibility History)]
+    Store -.->|Historical metrics & scan bounds| MCP
     MCP -.->|Structured tool results| Agent
     Agent -->|Grounded conversational answer| User
 
     subgraph Boundaries ["Strict Operational Boundaries"]
         style Boundaries fill:#1e293b,stroke:#dc2626,stroke-width:1px,stroke-dasharray: 5 5
-        B1["🔒 Read-Only Analytics (No writes to BigQuery)"]
+        B1["🔒 Read-Only Analytics (No writes from V4)"]
         B2["🚫 Isolated from V1/V3 (Cannot trigger live scans)"]
     end
 ```

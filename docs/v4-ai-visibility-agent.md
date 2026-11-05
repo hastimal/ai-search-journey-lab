@@ -10,7 +10,18 @@
 The V4 AI Visibility Agent provides natural-language business intelligence over historical AI search scans without writing any data or executing live web/places searches.
 
 ```text
-User Question ──▶ ADK Agent (Gemini) ──▶ Stdio MCP Toolset ──▶ local MCP Server ──▶ Read-Only BigQuery Analytics
+User Question ──▶ ADK Agent (Gemini) ──▶ Stdio MCP Toolset ──▶ local MCP Server ──▶ Read-Only Analytics (Local SQLite / BigQuery)
+```
+
+### Storage Backends: Local Persistent vs. BigQuery
+
+V4 supports dual backend modes controlled via `AI_SEARCH_HISTORY_BACKEND`:
+- **Local Mode (`AI_SEARCH_HISTORY_BACKEND=local`):** Uses SQLite stored in `.data/visibility_history.db`. Schema is created automatically with WAL mode and foreign keys enabled. It is shared directly between the application process (V3 scan writes) and the MCP subprocess (V4 analytics reads). No BigQuery setup or GCP project credentials are required.
+- **BigQuery Mode (`AI_SEARCH_HISTORY_BACKEND=bigquery`):** Connects to `ai_search_journey_v3` in BigQuery using parameterized queries for production/cloud deployments. Fails actionably if credentials or datasets are missing without silent fallbacks.
+
+To clear local history:
+```bash
+rm -rf .data/visibility_history.db
 ```
 
 ### Key Architectural Pillars

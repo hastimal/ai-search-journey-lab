@@ -1,14 +1,15 @@
-import os
 from datetime import datetime
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
-from ai_search_journey.config import settings
 from ai_search_journey.telemetry import trace_span
+from ai_search_journey.visibility.history_factory import (
+    get_configured_backend,
+    get_visibility_analytics_repository,
+)
 from ai_search_journey.visibility.v4_analytics import (
     AvailableHistoryRequest,
-    BigQueryVisibilityAnalyticsRepository,
     BrandTrendRequest,
     CitationAnalysisRequest,
     CompetitorComparisonRequest,
@@ -20,43 +21,27 @@ from ai_search_journey.visibility.v4_analytics import (
 server = MCPServer("AI Visibility Analytics V4")
 
 
-def _get_repository() -> VisibilityAnalyticsRepository:
-    project_id = (
-        settings.bigquery_project
-        or os.environ.get("GOOGLE_CLOUD_PROJECT")
-        or os.environ.get("BIGQUERY_PROJECT")
-    )
-    if not project_id:
-        raise RuntimeError("BigQuery repository unavailable: BIGQUERY_PROJECT not configured")
-    try:
-        return BigQueryVisibilityAnalyticsRepository(
-            project_id=project_id,
-            dataset_id=settings.bigquery_dataset,
-            location=settings.bigquery_location,
-        )
-    except Exception as e:
-        raise RuntimeError(f"BigQuery repository unavailable: {e}") from e
-
-
 repo: VisibilityAnalyticsRepository | None = None
 
 
 def get_repo() -> VisibilityAnalyticsRepository:
     global repo
     if repo is None:
-        repo = _get_repository()
+        repo = get_visibility_analytics_repository()
     return repo
 
 
 @server.tool()
 def get_available_history(lookback_days: int = 365) -> dict[str, Any]:
     """Discovers available historical scan metadata, date bounds, total scans,
-    distinct brands, and recent scan windows in BigQuery."""
+    distinct brands, and recent scan windows."""
+    backend = get_configured_backend()
     with trace_span(
         "v4.mcp_tool.get_available_history",
         attributes={
             "mcp.tool_name": "get_available_history",
             "mcp.lookback_days": lookback_days,
+            "storage.backend": backend,
             "bigquery.read_only": True,
         },
     ) as s_span:
@@ -64,6 +49,10 @@ def get_available_history(lookback_days: int = 365) -> dict[str, Any]:
         result = get_repo().get_available_history(req).model_dump()
         if s_span.is_recording():
             s_span.set_attribute("history.total_scans", result.get("total_scans", 0))
+        if result.get("total_scans", 0) == 0:
+            result["message"] = (
+                "No visibility scans are available yet. Run an AI Visibility scan first."
+            )
         return result
 
 
@@ -71,11 +60,13 @@ def get_available_history(lookback_days: int = 365) -> dict[str, Any]:
 def get_visibility_summary(start_date: str, end_date: str, brand_id: str) -> dict[str, Any]:
     """Aggregates overall brand visibility for a date range
     (mention, recommendation, citation rates)."""
+    backend = get_configured_backend()
     with trace_span(
         "v4.mcp_tool.get_visibility_summary",
         attributes={
             "mcp.tool_name": "get_visibility_summary",
             "mcp.brand_id": brand_id,
+            "storage.backend": backend,
             "bigquery.read_only": True,
         },
     ):
@@ -90,11 +81,13 @@ def get_visibility_summary(start_date: str, end_date: str, brand_id: str) -> dic
 def get_brand_trend(start_date: str, end_date: str, brand_id: str) -> dict[str, Any]:
     """Returns chronological data points showing how a brand's
     visibility metrics have changed over time."""
+    backend = get_configured_backend()
     with trace_span(
         "v4.mcp_tool.get_brand_trend",
         attributes={
             "mcp.tool_name": "get_brand_trend",
             "mcp.brand_id": brand_id,
+            "storage.backend": backend,
             "bigquery.read_only": True,
         },
     ):
@@ -108,11 +101,13 @@ def get_brand_trend(start_date: str, end_date: str, brand_id: str) -> dict[str, 
 @server.tool()
 def compare_brands(start_date: str, end_date: str, brand_ids: list[str]) -> dict[str, Any]:
     """Directly compares the visibility metrics of multiple brands side-by-side."""
+    backend = get_configured_backend()
     with trace_span(
         "v4.mcp_tool.compare_brands",
         attributes={
             "mcp.tool_name": "compare_brands",
             "mcp.brand_count": len(brand_ids) if brand_ids else 0,
+            "storage.backend": backend,
             "bigquery.read_only": True,
         },
     ) as s_span:
@@ -215,12 +210,14 @@ def analyze_citations(
 ) -> dict[str, Any]:
     """Analyzes which domains and source types are most frequently
     cited when a brand is mentioned."""
+    backend = get_configured_backend()
     with trace_span(
         "v4.mcp_tool.analyze_citations",
         attributes={
             "mcp.tool_name": "analyze_citations",
             "mcp.brand_id": brand_id,
             "mcp.limit": limit,
+            "storage.backend": backend,
             "bigquery.read_only": True,
         },
     ):
@@ -237,12 +234,14 @@ def find_fanout_gaps(
 ) -> dict[str, Any]:
     """Examines query fan-outs to identify specific long-tail queries
     where the brand was NOT found."""
+    backend = get_configured_backend()
     with trace_span(
         "v4.mcp_tool.find_fanout_gaps",
         attributes={
             "mcp.tool_name": "find_fanout_gaps",
             "mcp.brand_id": brand_id,
             "mcp.limit": limit,
+            "storage.backend": backend,
             "bigquery.read_only": True,
         },
     ):
