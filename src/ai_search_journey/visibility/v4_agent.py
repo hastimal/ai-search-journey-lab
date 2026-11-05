@@ -9,6 +9,7 @@ from google.adk.tools.mcp_tool import McpToolset, StdioConnectionParams
 from mcp.client.stdio import StdioServerParameters
 
 from ai_search_journey.config import settings
+from ai_search_journey.visibility.history_factory import get_configured_backend
 
 V4_AGENT_INSTRUCTIONS = """You are the AI Visibility Agent [V4] for the AI Search Journey Lab.
 Your role is to answer questions about historical brand visibility using strictly read-only
@@ -40,10 +41,15 @@ def create_v4_agent() -> Agent:
     if settings.gemini_api_key and "GEMINI_API_KEY" not in os.environ:
         os.environ["GEMINI_API_KEY"] = settings.gemini_api_key
 
+    env = os.environ.copy()
+    env["AI_SEARCH_HISTORY_BACKEND"] = get_configured_backend()
+    if settings.local_history_db_path:
+        env["LOCAL_HISTORY_DB_PATH"] = settings.local_history_db_path
+
     server_params = StdioServerParameters(
         command=sys.executable,
         args=["-m", "ai_search_journey.visibility.mcp_server"],
-        env=os.environ.copy()
+        env=env,
     )
     mcp_params = StdioConnectionParams(
         server_params=server_params,
@@ -78,7 +84,6 @@ class VisibilityAnalyticsAgent:
         from google.adk.sessions import InMemorySessionService
 
         # If settings.gemini_api_key is configured but GEMINI_API_KEY is absent, safely set it
-        from ai_search_journey.config import settings
         if settings.gemini_api_key and "GEMINI_API_KEY" not in os.environ:
             os.environ["GEMINI_API_KEY"] = settings.gemini_api_key
 
@@ -115,7 +120,7 @@ class VisibilityAnalyticsAgent:
                     "workflow.stage": "v4",
                     "v4.session_id": session_id,
                     "agent.operation": "load_context",
-                    "storage.backend": "bigquery" if settings.bigquery_project else "memory",
+                    "storage.backend": get_configured_backend(),
                 },
             ):
                 # Prepare runner context & message payload

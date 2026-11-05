@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     google_maps_api_key: Optional[str] = None
 
     log_level: str = "INFO"
+    ai_search_history_backend: Optional[str] = None
+    local_history_db_path: str = ".data/visibility_history.db"
     bigquery_project: Optional[str] = None
     bigquery_dataset: str = "ai_search_journey_v3"
     bigquery_location: str = "US"
@@ -37,6 +39,8 @@ class Settings(BaseSettings):
         "gemini_model",
         "gemini_fallback_model",
         "google_maps_api_key",
+        "ai_search_history_backend",
+        "local_history_db_path",
         "bigquery_project",
         "bigquery_dataset",
         "bigquery_location",
@@ -53,6 +57,18 @@ class Settings(BaseSettings):
         if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
             return s[1:-1].strip()
         return s
+
+    @field_validator("ai_search_history_backend")
+    @classmethod
+    def validate_backend(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        backend = v.strip().lower()
+        if backend not in ("local", "bigquery"):
+            raise ValueError(
+                f"Invalid AI_SEARCH_HISTORY_BACKEND: '{v}'. Must be 'local' or 'bigquery'."
+            )
+        return backend
 
 
 settings = Settings()
