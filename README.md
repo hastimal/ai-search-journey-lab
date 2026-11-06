@@ -402,6 +402,16 @@ GOOGLE_MAPS_API_KEY="YOUR_GOOGLE_MAPS_API_KEY"
 LOG_LEVEL="INFO"
 ```
 
+### Environment Diagnostics (`doctor`)
+
+Diagnose common environment and configuration issues before running the lab:
+
+```bash
+ai-search-journey-lab doctor
+```
+
+This inspects Python version, core dependencies, API configurations (safely masked), Docker daemon availability, and port conflicts with actionable remediation tips.
+
 ### Running Tests & Quality Checks
 
 ```bash

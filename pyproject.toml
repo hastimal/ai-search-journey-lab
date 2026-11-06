@@ -39,6 +39,9 @@ v4-agent = [
     "mcp>=2.2.0",
 ]
 
+[project.scripts]
+ai-search-journey-lab = "ai_search_journey.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

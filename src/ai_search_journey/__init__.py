@@ -1,58 +1,61 @@
-from ai_search_journey.adk import (
-    SEARCH_JOURNEY_AGENT_INSTRUCTIONS,
-    SearchJourneyAgent,
-    places_retrieval_tool,
-    reference_location_tool,
-    search_grounding_tool,
-)
-from ai_search_journey.answer import generate_grounded_answer
-from ai_search_journey.constraints import evaluate_constraints
-from ai_search_journey.evidence import (
-    aggregate_evidence,
-    calculate_citation_coverage,
-    calculate_evidence_coverage,
-)
-from ai_search_journey.fanout import generate_fanout
-from ai_search_journey.models import (
-    Candidate,
-    CandidateConstraintEvaluation,
-    CandidateEvidence,
-    ConstraintEvaluationResult,
-    ConstraintResult,
-    ConstraintStatus,
-    ConstraintSupport,
-    Evidence,
-    EvidenceAggregationResult,
-    EvidenceSource,
-    FanoutQuery,
-    FinalRecommendation,
-    GroundedAnswer,
-    IntentType,
-    JourneyResult,
-    MapMarker,
-    RankedCandidate,
-    ReferenceLocation,
-    RetrievalOccurrence,
-    ScoreBreakdown,
-    SearchCitation,
-    SearchGroundingResult,
-    SearchIntent,
-    SearchSource,
-    StaticMapResult,
-    ToolName,
-)
-from ai_search_journey.normalize import is_reference_location, normalize_candidates
-from ai_search_journey.places import resolve_reference_location, search_places
-from ai_search_journey.planner import extract_intent
-from ai_search_journey.ranking import generate_movement_explanation, rank_candidates
-from ai_search_journey.search import search_web
-from ai_search_journey.static_map import (
-    build_static_map_url,
-    generate_static_map,
-    redact_api_key_in_url,
-)
-
 __version__ = "2.0.0"
+
+try:
+    from ai_search_journey.adk import (
+        SEARCH_JOURNEY_AGENT_INSTRUCTIONS,
+        SearchJourneyAgent,
+        places_retrieval_tool,
+        reference_location_tool,
+        search_grounding_tool,
+    )
+    from ai_search_journey.answer import generate_grounded_answer
+    from ai_search_journey.constraints import evaluate_constraints
+    from ai_search_journey.evidence import (
+        aggregate_evidence,
+        calculate_citation_coverage,
+        calculate_evidence_coverage,
+    )
+    from ai_search_journey.fanout import generate_fanout
+    from ai_search_journey.models import (
+        Candidate,
+        CandidateConstraintEvaluation,
+        CandidateEvidence,
+        ConstraintEvaluationResult,
+        ConstraintResult,
+        ConstraintStatus,
+        ConstraintSupport,
+        Evidence,
+        EvidenceAggregationResult,
+        EvidenceSource,
+        FanoutQuery,
+        FinalRecommendation,
+        GroundedAnswer,
+        IntentType,
+        JourneyResult,
+        MapMarker,
+        RankedCandidate,
+        ReferenceLocation,
+        RetrievalOccurrence,
+        ScoreBreakdown,
+        SearchCitation,
+        SearchGroundingResult,
+        SearchIntent,
+        SearchSource,
+        StaticMapResult,
+        ToolName,
+    )
+    from ai_search_journey.normalize import is_reference_location, normalize_candidates
+    from ai_search_journey.places import resolve_reference_location, search_places
+    from ai_search_journey.planner import extract_intent
+    from ai_search_journey.ranking import generate_movement_explanation, rank_candidates
+    from ai_search_journey.search import search_web
+    from ai_search_journey.static_map import (
+        build_static_map_url,
+        generate_static_map,
+        redact_api_key_in_url,
+    )
+except ImportError:
+    pass
 
 __all__ = [
     "IntentType",

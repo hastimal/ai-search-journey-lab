@@ -39,6 +39,9 @@ pip install -e ".[bigquery,v4-agent,dev]"
 
 # 4. Create your local environment file
 cp .env.example .env
+
+# 5. Verify your setup with environment diagnostics
+ai-search-journey-lab doctor
 ```
 
 Edit `.env` and add your keys:
@@ -164,6 +167,12 @@ Documentation tips:
 - Check that all relative links still resolve.
 
 ## Troubleshooting
+
+Run the doctor command to identify configuration or dependency issues:
+
+```bash
+ai-search-journey-lab doctor
+```
 
 Having trouble with setup, Docker, or the observability stack? See the
 [Dockerized Observability Guide](docs/bonus-b-dockerized-observability.md), which includes troubleshooting steps.
