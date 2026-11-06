@@ -136,6 +136,10 @@ The pipeline operates on arbitrary local discovery questions without hardcoded l
 
 ## 5. Architecture
 
+See the [architecture guide](docs/ARCHITECTURE.md) for the query lifecycle,
+source-code map, evidence contracts, V3/V4 visibility, observability and
+deployment boundaries.
+
 ```text
                                               User Question
                                                     │
